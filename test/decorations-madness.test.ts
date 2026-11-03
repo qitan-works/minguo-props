@@ -3,7 +3,7 @@ import { describe, it } from 'node:test';
 
 import { bloodPalette, decorationShape, placeDecoration, type Primitive } from '../src/lib/decorations.ts';
 import { rectsOverlap } from '../src/lib/geometry.ts';
-import { charJitter, madText } from '../src/lib/madness.ts';
+import { charJitter, madGlyph, madText } from '../src/lib/madness.ts';
 import { stripMarkup } from '../src/lib/markup.ts';
 import { DECORATION_TYPES } from '../src/props/extras.ts';
 
@@ -41,37 +41,81 @@ describe('裝飾形狀', () => {
 
 describe('越寫越亂', () => {
   const o = { strength: 80, start: 10, seed: 5 };
+  const run = (strength: number, from: number, to: number, total = 1000) =>
+    Array.from({ length: to - from }, (_, i) => madGlyph(from + i, total, { strength, start: 0, seed: 9 })!);
+  const mean = (xs: number[]): number => xs.reduce((a, b) => a + b, 0) / Math.max(1, xs.length);
 
   it('開始之前或強度為 0 時不變形', () => {
-    assert.equal(charJitter(3, 100, o), null);
-    assert.equal(charJitter(50, 100, { ...o, strength: 0 }), null);
+    assert.equal(madGlyph(3, 100, o), null);
+    assert.equal(madGlyph(50, 100, { ...o, strength: 0 }), null);
   });
 
   it('同一種子結果相同，數值在合理範圍', () => {
     for (let i = 10; i < 100; i++) {
-      const j = charJitter(i, 100, o);
-      assert.deepEqual(j, charJitter(i, 100, o));
+      const j = madGlyph(i, 100, o);
+      assert.deepEqual(j, madGlyph(i, 100, o));
       assert.ok(j);
-      assert.ok(Math.abs(j.dx) <= 0.45 && Math.abs(j.dy) <= 0.45);
-      assert.ok(Math.abs(j.rotate) <= 45);
-      assert.ok(j.scale >= 0.7 && j.scale <= 1.45);
-      assert.ok(j.ink >= 0.4 && j.ink <= 1);
+      assert.ok(Math.abs(j.dx) <= 1 && Math.abs(j.dy) <= 0.4);
+      assert.ok(j.size >= 0.8 && j.size <= 1.7);
+      assert.ok(j.ink >= 0.3 && j.ink <= 1);
+      assert.ok(j.gap >= -0.45 && j.gap <= 0.6);
+      assert.ok(j.overdraw.length <= 2);
     }
+    assert.deepEqual(charJitter(50, 100, o)?.dx, madGlyph(50, 100, o)?.dx);
   });
 
-  it('越往後越亂（平均旋轉幅度變大）', () => {
-    const avg = (from: number, to: number): number => {
-      let sum = 0;
-      for (let i = from; i < to; i++) sum += Math.abs(charJitter(i, 1000, { strength: 100, start: 0, seed: 9 })?.rotate ?? 0);
-      return sum / (to - from);
-    };
-    assert.ok(avg(800, 1000) > avg(0, 200) * 1.5);
+  it('越往後越亂、字越寫越大', () => {
+    const early = run(100, 0, 150);
+    const late = run(100, 850, 1000);
+    assert.ok(mean(late.map((g) => Math.abs(g.rotate % 180))) > mean(early.map((g) => Math.abs(g.rotate % 180))) * 1.5);
+    assert.ok(mean(late.map((g) => g.size)) > mean(early.map((g) => g.size)) + 0.3);
+  });
+
+  it('強度 60 明顯：後段平均旋轉超過 8 度、字放大兩成以上、有重描', () => {
+    const late = run(60, 800, 1000);
+    assert.ok(mean(late.map((g) => Math.abs(g.rotate))) > 12);
+    assert.ok(mean(late.map((g) => g.size)) > 1.2);
+    assert.ok(late.filter((g) => g.overdraw.length > 0).length > 20);
+  });
+
+  it('強度 100 接近失控：有橫躺與倒寫的字、墨團、大量重描、字距重疊、墨色忽深忽淺', () => {
+    const late = run(100, 500, 1000);
+    assert.ok(late.some((g) => g.flip === 90) && late.some((g) => g.flip === 180));
+    assert.ok(late.filter((g) => g.flip !== 0).length < late.length * 0.05, '只有少數字橫躺或倒寫');
+    assert.ok(late.some((g) => g.blob));
+    assert.ok(late.filter((g) => g.overdraw.length > 0).length > late.length * 0.25);
+    assert.ok(late.some((g) => g.gap < -0.2));
+    assert.ok(late.some((g) => g.ink < 0.5) && late.some((g) => g.ink === 1));
+  });
+
+  it('行歪斜：位移沿字序平滑變化，相鄰兩字差得比隨機小', () => {
+    const late = run(100, 600, 900);
+    const steps = late.slice(1).map((g, i) => Math.abs(g.dx - late[i]!.dx));
+    const spread = Math.max(...late.map((g) => g.dx)) - Math.min(...late.map((g) => g.dx));
+    assert.ok(spread > 1, '整行要偏離格線');
+    assert.ok(mean(steps) < spread / 4, '相鄰的字要接近，看起來是整行歪');
+  });
+
+  it('亂到一半換字型', () => {
+    const opts = { strength: 70, start: 0, seed: 3, switchAt: 0.5 };
+    assert.equal(madGlyph(100, 1000, opts)?.alt, false);
+    assert.equal(madGlyph(700, 1000, opts)?.alt, true);
+    assert.equal(madGlyph(700, 1000, { strength: 70, start: 0, seed: 3 })?.alt, false);
   });
 
   it('同一句重複：開始之後的第一句再寫兩遍', () => {
     const text = '前言照常。夜半有聲。燈將熄矣。';
     const out = madText(text, { start: 5, seed: 1, rewrite: false, repeat: true });
     assert.equal(out, '前言照常。夜半有聲。夜半有聲。夜半有聲。燈將熄矣。');
+  });
+
+  it('同一句寫滿整頁：一直重複到字數夠，後面的原文不再出現', () => {
+    const text = '前言照常。夜半有聲。燈將熄矣。';
+    const out = madText(text, { start: 5, seed: 1, rewrite: false, repeat: false, fill: 200 });
+    assert.ok(Array.from(out).length >= 200);
+    assert.ok(out.startsWith('前言照常。夜半有聲。夜半有聲。'));
+    assert.equal(out.includes('燈將熄矣'), false);
+    assert.equal(out.replaceAll('夜半有聲。', '').replace('前言照常。', ''), '');
   });
 
   it('塗改後重寫：插入刪除線標記，去掉標記後原文的字順序不變', () => {

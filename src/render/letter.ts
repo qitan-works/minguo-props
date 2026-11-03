@@ -6,7 +6,8 @@ import type { LetterData } from '../props/letter.ts';
 import type { Polygon } from '../lib/geometry.ts';
 import { pickConditions } from '../props/conditions.ts';
 import { h, paragraphs } from '../ui/dom.ts';
-import { charJitter, madText } from '../lib/madness.ts';
+import { madGlyph, madText } from '../lib/madness.ts';
+import { fontStack } from '../fonts.ts';
 import { hasMarkup, stripMarkup } from '../lib/markup.ts';
 import { fillMarked, fillMarkedMad } from '../ui/marked.ts';
 import { createPaperSurface, createSheet } from './sheet.ts';
@@ -62,18 +63,32 @@ export function renderLetter(data: LetterData, crop: Polygon | null = null): HTM
     attrs: { 'data-fit': data.madness > 0 && data.madOverflow ? null : '' },
   });
   if (data.salutation) text.appendChild(fillMarked(h('p', { class: 'lt-salutation' }), data.salutation));
-  const mad = { strength: data.madness, start: data.madStart, seed: data.effectSeed };
+  const fillPage = data.madness > 0 && data.madFillPage;
   if (data.madness > 0) {
-    // 越寫越亂：塗改、重複的句子先寫進文字，再逐字套上偏移
+    // 越寫越亂：塗改、重複的句子先寫進文字，再逐字套上偏移、字級、重描等
+    if (data.madFont) content.style.setProperty('--f-hand2', fontStack(data.madFont, 'hand'));
+    const capacity = Math.round(columns * Math.floor(frameH / (fontSize * 1.08)) * 1.15);
     const bodyParas = paragraphs(data.body);
-    const total = bodyParas.reduce((n, para) => n + Array.from(stripMarkup(para)).length, 0) + 40;
-    let index = 0;
-    bodyParas.forEach((para, k) => {
+    const written: string[] = [];
+    let count = 0;
+    for (const [k, para] of bodyParas.entries()) {
       const plain = !hasMarkup(para);
-      const localStart = Math.max(0, data.madStart - index);
-      const written = plain && (data.madRewrite || data.madRepeat) ? madText(para, { start: localStart, seed: data.effectSeed + k, rewrite: data.madRewrite, repeat: data.madRepeat }) : para;
-      const p = h('p', { class: ['lt-p', data.indent && 'lt-indent', data.madOverflow && k === bodyParas.length - 1 && 'mad-overflow'] });
-      index = fillMarkedMad(p, written, index, (i) => charJitter(i, total, mad));
+      const localStart = Math.max(0, data.madStart - count);
+      const length = Array.from(stripMarkup(para)).length;
+      if (fillPage && plain && localStart < length) {
+        written.push(madText(para, { start: localStart, seed: data.effectSeed + k, rewrite: data.madRewrite, repeat: false, fill: Math.max(length, capacity - count) }));
+        break;
+      }
+      written.push(plain && (data.madRewrite || data.madRepeat) ? madText(para, { start: localStart, seed: data.effectSeed + k, rewrite: data.madRewrite, repeat: data.madRepeat }) : para);
+      count += length;
+    }
+    const total = written.reduce((n, para) => n + Array.from(stripMarkup(para)).length, 0) + (fillPage ? 0 : 40);
+    const mad = { strength: data.madness, start: data.madStart, seed: data.effectSeed, ...(data.madFont ? { switchAt: 0.5 } : {}) };
+    let index = 0;
+    written.forEach((para, k) => {
+      // 寫滿整頁時不要讓最後一段不換行（否則只會變成一條超長的直行）
+      const p = h('p', { class: ['lt-p', data.indent && 'lt-indent', data.madOverflow && !fillPage && k === written.length - 1 && 'mad-overflow'] });
+      index = fillMarkedMad(p, para, index, (i) => madGlyph(i, total, mad));
       text.appendChild(p);
     });
   } else {
@@ -81,11 +96,11 @@ export function renderLetter(data: LetterData, crop: Polygon | null = null): HTM
       text.appendChild(fillMarked(h('p', { class: ['lt-p', data.indent && 'lt-indent'] }), para));
     }
   }
-  paragraphs(data.closing).forEach((line, i) => {
+  if (!fillPage) paragraphs(data.closing).forEach((line, i) => {
     text.appendChild(fillMarked(h('p', { class: ['lt-closing', i === 0 ? 'lt-closing-first' : 'lt-closing-raise'] }), line));
   });
-  if (data.signature) text.appendChild(fillMarked(h('p', { class: 'lt-signature' }), data.signature));
-  const dateText = letterDateText(data);
+  if (data.signature && !fillPage) text.appendChild(fillMarked(h('p', { class: 'lt-signature' }), data.signature));
+  const dateText = fillPage ? '' : letterDateText(data);
   if (dateText) text.appendChild(h('p', { class: 'lt-date', text: dateText }));
   content.appendChild(text);
 

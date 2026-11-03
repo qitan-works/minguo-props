@@ -747,14 +747,17 @@
 
 .lt.ink-black {
   --ink-color: #1c1813;
+  --ink-rgb: 28 24 19;
 }
 
 .lt.ink-blue {
   --ink-color: #1f3567;
+  --ink-rgb: 31 53 103;
 }
 
 .lt.ink-brown {
   --ink-color: #5b3b1f;
+  --ink-rgb: 91 59 31;
 }
 
 .lt-frame {
@@ -1110,7 +1113,28 @@
 /* ---------- 瘋狂手寫（src/lib/madness.ts） ---------- */
 
 .mad {
+  position: relative;
   display: inline-block;
+  color: rgb(var(--ink-rgb, 28 24 19) / var(--a, 1));
+}
+
+/* 亂到一半換成第二個手寫字型 */
+.mad-alt {
+  font-family: var(--f-hand2, var(--f-hand));
+}
+
+/* 重描：同一個字再寫一兩次，微微錯開 */
+.mad-over {
+  position: absolute;
+  inset: 0;
+  color: rgb(var(--ink-rgb, 28 24 19) / var(--a, 0.7));
+}
+
+/* 墨團 */
+.mad-blob {
+  position: absolute;
+  border-radius: 48% 52% 45% 55%;
+  background: radial-gradient(ellipse at 45% 40%, rgb(var(--ink-rgb, 28 24 19) / 0.95) 0 52%, rgb(var(--ink-rgb, 28 24 19) / 0.55) 68%, transparent 74%);
 }
 
 .lt-overflow {

@@ -1,6 +1,7 @@
 // 信箋：欄位定義與預設內容。
 
 import { fontFields, paperOptions } from './common.ts';
+import { FONT_OPTIONS } from '../fonts.ts';
 import { conditionDefaults, conditionFields } from './conditions.ts';
 import type { DataOf, Field } from './schema.ts';
 
@@ -60,6 +61,16 @@ export const letterFields = [
   { key: 'madRewrite', type: 'checkbox', label: '夾雜塗改後重寫', group: '瘋狂手寫', showIf: { key: 'madness', in: MADNESS_ON } },
   { key: 'madRepeat', type: 'checkbox', label: '同一句重複', group: '瘋狂手寫', showIf: { key: 'madness', in: MADNESS_ON } },
   { key: 'madOverflow', type: 'checkbox', label: '字擠出邊界', group: '瘋狂手寫', showIf: { key: 'madness', in: MADNESS_ON } },
+  { key: 'madFillPage', type: 'checkbox', label: '同一句寫滿整頁', group: '瘋狂手寫', hint: '開始變亂後的第一句一直重複，寫滿整張信紙（結尾敬語與署名不再出現）。', showIf: { key: 'madness', in: MADNESS_ON } },
+  {
+    key: 'madFont',
+    type: 'select',
+    label: '亂到一半換字型',
+    group: '瘋狂手寫',
+    options: [{ value: '', label: '不換' }, ...FONT_OPTIONS],
+    hint: '越亂的後半段改用這個手寫字型，例如從鋼筆行楷換成清松手寫體 7 飄逸。',
+    showIf: { key: 'madness', in: MADNESS_ON },
+  },
   ...fontFields('字型'),
   ...conditionFields('紙張狀況', '更多痕跡'),
 ] as const satisfies readonly Field[];
@@ -87,6 +98,8 @@ export const letterDefaults: LetterData = {
   madRewrite: false,
   madRepeat: false,
   madOverflow: false,
+  madFillPage: false,
+  madFont: '',
   fontTitle: 'noto-serif',
   fontBody: 'noto-serif',
   fontHand: 'lxgw',

@@ -10,6 +10,8 @@ import { renderNewspaperFull, type FullPageRender } from './render/newspaper-ful
 import { applyPaperEffects } from './render/effects.ts';
 import { drawDecorations } from './render/decorations.ts';
 import { buildDecorationEditor } from './ui/decorations.ts';
+import { placeDecoration } from './lib/decorations.ts';
+import { measureMarks } from './render/effects.ts';
 import { PX_PER_MM } from './lib/geometry.ts';
 import { applyPreset, pickConditions } from './props/conditions.ts';
 import { startCropDrawing, type CropSession, type CropTool } from './ui/crop.ts';
@@ -171,9 +173,16 @@ function rebuildForm(): void {
     buildDecorationEditor({
       decorations: state.extras[kind].decorations,
       selectedId: selectedDeco,
-      center: () => {
+      place: (radius, existing) => {
         const paper = els.stage.querySelector<HTMLElement>('.paper');
-        return paper ? { x: paper.offsetWidth / PX_PER_MM / 2, y: paper.offsetHeight / PX_PER_MM / 2 } : { x: 50, y: 50 };
+        if (!paper) return { x: 50, y: 50 };
+        return placeDecoration({
+          width: paper.offsetWidth / PX_PER_MM,
+          height: paper.offsetHeight / PX_PER_MM,
+          radius,
+          existing,
+          protect: measureMarks(paper, 'protect'),
+        });
       },
       onChange(decorations, redraw) {
         state = updateExtras(state, kind, { decorations } as never);

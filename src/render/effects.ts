@@ -31,7 +31,7 @@ export function setPaperCrop(paper: HTMLElement, crop: Polygon | null): void {
 }
 
 /** 量出紙面內標了 data-mark 的元素位置（紙面座標，公釐）。 */
-function measureMarks(paper: HTMLElement, mark: 'protect' | 'destroy'): Rect[] {
+export function measureMarks(paper: HTMLElement, mark: 'protect' | 'destroy'): Rect[] {
   const box = paper.getBoundingClientRect();
   const scale = box.width / (paper.offsetWidth || 1);
   if (!Number.isFinite(scale) || scale === 0) return [];

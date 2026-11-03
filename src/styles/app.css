@@ -527,3 +527,10 @@ textarea:focus-visible {
   align-items: center;
   font-size: 0.85rem;
 }
+
+.deco-check {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+}

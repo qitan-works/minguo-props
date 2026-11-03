@@ -56,6 +56,8 @@ export interface Decoration {
   readonly seed: number;
   /** 戳記、眉批等的文字。 */
   readonly text: string;
+  /** 血跡類：乾涸（褐色）或新鮮（鮮紅）。 */
+  readonly dry: boolean;
 }
 
 export interface PropExtras {
@@ -166,7 +168,9 @@ export function sanitizeDecoration(v: unknown): Decoration | null {
   if (id === null || type === null || x === null || y === null || rotate === null || scale === null || opacity === null || z === null || seed === null || text === null) {
     return null;
   }
-  return { id, type, x, y, rotate, scale, opacity, z, seed, text };
+  // 第三版新增：沒有這個欄位的舊存檔視為乾涸
+  const dry = typeof v['dry'] === 'boolean' ? v['dry'] : true;
+  return { id, type, x, y, rotate, scale, opacity, z, seed, text, dry };
 }
 
 function sanitizeList<T>(v: unknown, limit: number, item: (x: unknown) => T | null, label: string, warnings: string[]): T[] {

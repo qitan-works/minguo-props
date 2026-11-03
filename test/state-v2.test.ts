@@ -19,7 +19,7 @@ describe('存檔格式第二版', () => {
       ],
     });
     state = updateExtras(state, 'letter', {
-      decorations: [{ id: 'd1', type: 'stamp', x: 50, y: 60, rotate: -12, scale: 1.2, opacity: 0.8, z: 2, seed: 99, text: '機密' }],
+      decorations: [{ id: 'd1', type: 'stamp', x: 50, y: 60, rotate: -12, scale: 1.2, opacity: 0.8, z: 2, seed: 99, text: '機密', dry: true }],
     });
     const result = parseSaveText(serializeState(state));
     assert.ok(result.ok);

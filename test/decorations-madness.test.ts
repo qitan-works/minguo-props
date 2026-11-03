@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { decorationShape, type Primitive } from '../src/lib/decorations.ts';
+import { bloodPalette, decorationShape, placeDecoration, type Primitive } from '../src/lib/decorations.ts';
+import { rectsOverlap } from '../src/lib/geometry.ts';
 import { charJitter, madText } from '../src/lib/madness.ts';
 import { stripMarkup } from '../src/lib/markup.ts';
 import { DECORATION_TYPES } from '../src/props/extras.ts';
@@ -81,5 +82,89 @@ describe('越寫越亂', () => {
     assert.equal(kept, text);
     assert.ok(stripMarkup(out).length > text.length);
     assert.equal(out.slice(0, 3), text.slice(0, 3));
+  });
+});
+
+describe('裝飾的質感（第三版）', () => {
+  const rgb = (c: string): number[] => (/rgb\((\d+) (\d+) (\d+)/.exec(c) ?? []).slice(1).map(Number);
+
+  it('血跡分新鮮與乾涸：新鮮偏鮮紅，乾涸偏褐，都是紅大於綠藍', () => {
+    const fresh = bloodPalette(false);
+    const dry = bloodPalette(true);
+    for (const pal of [fresh, dry]) for (const c of Object.values(pal)) {
+      const [r, g, b] = rgb(c);
+      assert.ok(r! > g! && r! > b!, c);
+    }
+    // 乾涸的綠色成分較高（偏褐），新鮮的較純紅
+    assert.ok(rgb(dry.mid)[1]! > rgb(fresh.mid)[1]!);
+    assert.notDeepEqual(decorationShape('blood-splatter', 5, '', true), decorationShape('blood-splatter', 5, '', false));
+  });
+
+  it('噴濺：中心淡邊緣深的漸層、不規則邊緣、大小不一的衛星血點與拉長血滴', () => {
+    const shape = decorationShape('blood-splatter', 21, '', true);
+    const grad = shape.gradients?.[0];
+    assert.ok(grad);
+    const alpha = (c: string): number => Number(/\/ ([0-9.]+)\)/.exec(c)?.[1]);
+    assert.ok(alpha(grad.stops[0]![1]) < alpha(grad.stops[grad.stops.length - 1]![1]), '中心要比邊緣淡');
+    assert.ok(shape.primitives.some((p) => p.kind === 'path' && p.filter === 'rough'));
+    const drops = shape.primitives.filter((p) => p.kind === 'path' && p.fill !== 'none' && !p.fill.startsWith('grad:'));
+    assert.ok(drops.length >= 40, `只有 ${drops.length} 個血點`);
+    assert.ok(shape.primitives.some((p) => p.kind === 'path' && p.filter === 'fine'), '要有拉長的血滴');
+  });
+
+  it('滴落有淚滴形與流痕；拖痕有斷續的刷痕', () => {
+    const drip = decorationShape('blood-drip', 3, '', false);
+    assert.ok(drip.primitives.filter((p) => p.kind === 'path' && p.filter === 'fine').length >= 4);
+    const smear = decorationShape('blood-smear', 3, '', true);
+    const streaks = smear.primitives.filter((p) => p.kind === 'path' && p.fill === 'none' && p.stroke);
+    assert.ok(streaks.length >= 18);
+    assert.ok(streaks.some((p) => p.kind === 'path' && p.dash), '刷痕要斷斷續續');
+  });
+
+  it('血手印：掌與五指，遮罩留出掌紋、指節與缺塊', () => {
+    const shape = decorationShape('handprint', 8, '', true);
+    const filled = shape.primitives.filter((p) => p.kind === 'path' && p.fill !== 'none');
+    assert.ok(filled.length >= 1 + 5 * 2, '掌、五指與指尖');
+    const mask = shape.mask ?? [];
+    assert.equal(mask[0]?.kind === 'path' && mask[0].fill, 'white');
+    assert.ok(mask.filter((p) => p.kind === 'path' && p.stroke === 'black').length >= 3 + 9, '掌紋三條＋指節');
+    assert.ok(mask.filter((p) => p.kind === 'path' && p.fill === 'black').length >= 2, '按壓不均的缺塊');
+  });
+
+  it('抓痕：三到四道，頭尾尖細，中間露出淺色纖維', () => {
+    for (const seed of [1, 2, 3, 4, 5]) {
+      const shape = decorationShape('claw', seed, '');
+      const gouges = shape.primitives.filter((p) => p.kind === 'path' && p.fill.startsWith('rgb(48 20 10'));
+      assert.ok(gouges.length >= 3 && gouges.length <= 4);
+      for (const g of gouges) {
+        if (g.kind !== 'path') continue;
+        const nums = (g.d.match(/-?\d+(?:\.\d+)?/g) ?? []).map(Number);
+        const pts: { x: number; y: number }[] = [];
+        for (let i = 0; i + 1 < nums.length; i += 2) pts.push({ x: nums[i]!, y: nums[i + 1]! });
+        const half = pts.length / 2;
+        const width = (k: number): number => Math.abs(pts[pts.length - 1 - k]!.x - pts[k]!.x);
+        assert.ok(width(0) < 0.15 && width(Math.floor(half / 2)) > 1, '頭要尖、中間要寬');
+      }
+      assert.ok(shape.primitives.some((p) => p.kind === 'path' && p.fill.startsWith('rgb(214 196 160')));
+    }
+  });
+
+  it('黏液半透明、有光澤與垂流', () => {
+    const shape = decorationShape('slime', 4, '');
+    const stops = shape.gradients?.[0]?.stops ?? [];
+    assert.ok(stops.every(([, c]) => Number(/\/ ([0-9.]+)\)/.exec(c)?.[1]) < 0.7));
+    assert.ok(shape.primitives.some((p) => p.kind === 'path' && p.fill.startsWith('rgb(245 255 235')));
+  });
+
+  it('新增的裝飾不疊在正中央：依序錯開、避開保護區、留在紙內', () => {
+    const protect = [{ x: 90, y: 130, w: 40, h: 30 }];
+    const existing: { x: number; y: number }[] = [];
+    for (let i = 0; i < 6; i++) {
+      const p = placeDecoration({ width: 210, height: 297, radius: 20, existing, protect });
+      assert.ok(p.x > 10 && p.y > 10 && p.x < 200 && p.y < 287);
+      assert.ok(!rectsOverlap({ x: p.x - 16, y: p.y - 16, w: 32, h: 32 }, protect[0]!), `第 ${i + 1} 個碰到保護區`);
+      for (const e of existing) assert.ok(Math.hypot(e.x - p.x, e.y - p.y) >= 20, '和前一個疊在一起');
+      existing.push(p);
+    }
   });
 });

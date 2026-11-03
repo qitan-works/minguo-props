@@ -1,6 +1,6 @@
 // 裝飾編輯器：選種類加到紙上，逐項調整旋轉、縮放、透明度、疊放順序與文字。
 
-import { DEFAULT_TEXT } from '../lib/decorations.ts';
+import { BLOOD_TYPES, DEFAULT_TEXT, decorationShape } from '../lib/decorations.ts';
 import { freshSeed } from '../lib/random.ts';
 import { DECORATION_TYPES, LIMITS, newId, type Decoration, type DecorationType } from '../props/extras.ts';
 import { h } from './dom.ts';
@@ -9,8 +9,8 @@ const TEXT_TYPES = new Set<DecorationType>(['stamp', 'pencil-note', 'wax-seal', 
 
 export interface DecorationEditorOptions {
   readonly decorations: readonly Decoration[];
-  /** 新裝飾放在紙的哪裡（公釐）。 */
-  readonly center: () => { readonly x: number; readonly y: number };
+  /** 新裝飾放在紙的哪裡（公釐）：依序錯開、避開保護區與已有的裝飾。 */
+  readonly place: (radius: number, existing: readonly Decoration[]) => { readonly x: number; readonly y: number };
   readonly selectedId: string | null;
   onChange(decorations: Decoration[], redraw: boolean): void;
   onSelect(id: string | null): void;
@@ -66,6 +66,12 @@ export function buildDecorationEditor(o: DecorationEditorOptions): HTMLElement {
       slider('縮放', 0.2, 4, 0.05, d.scale, '×', (v) => update(d.id, { scale: v })),
       slider('透明度', 0.05, 1, 0.05, d.opacity, '', (v) => update(d.id, { opacity: v })),
     );
+    if (BLOOD_TYPES.includes(d.type)) {
+      const dry = h('input', { attrs: { type: 'checkbox' } });
+      dry.checked = d.dry;
+      dry.addEventListener('change', () => update(d.id, { dry: dry.checked }));
+      el.appendChild(h('label', { class: 'deco-check' }, dry, h('span', { text: '乾涸（氧化成暗紅褐色；不勾為新鮮的鮮紅）' })));
+    }
     if (TEXT_TYPES.has(d.type)) {
       const text = h('input', { attrs: { type: 'text', maxlength: LIMITS.decorationText, 'aria-label': '文字', placeholder: DEFAULT_TEXT[d.type] ?? '' } });
       text.value = d.text;
@@ -85,17 +91,20 @@ export function buildDecorationEditor(o: DecorationEditorOptions): HTMLElement {
   add.addEventListener('click', () => {
     if (items.length >= LIMITS.decorations) return;
     const t = type.value as DecorationType;
+    const seed = freshSeed();
+    const at = o.place(decorationShape(t, seed, '').radius, items);
     const d: Decoration = {
       id: newId('d'),
       type: t,
-      x: o.center().x,
-      y: o.center().y,
+      x: at.x,
+      y: at.y,
       rotate: t === 'stamp' ? -12 : 0,
       scale: 1,
       opacity: t.startsWith('blood') || t === 'handprint' ? 0.85 : 1,
       z: items.length ? Math.max(...items.map((x) => x.z)) + 1 : 0,
-      seed: freshSeed(),
+      seed,
       text: DEFAULT_TEXT[t] ?? '',
+      dry: true,
     };
     items = [...items, d];
     emit(true);

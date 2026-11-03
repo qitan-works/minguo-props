@@ -16,7 +16,9 @@
     "build": "node scripts/build.ts",
     "serve": "node scripts/serve.ts",
     "data:telegraph": "node scripts/unihan-telegraph.ts",
-    "data:check": "node scripts/unihan-telegraph.ts --check"
+    "data:check": "node scripts/unihan-telegraph.ts --check",
+    "data:lunar": "node scripts/lunar-table.ts",
+    "data:lunar-check": "node scripts/lunar-table.ts --check"
   },
   "devDependencies": {
     "@fontsource-variable/noto-serif-tc": "5.3.1",

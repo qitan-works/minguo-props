@@ -30,6 +30,16 @@
 
 ![字型總覽](docs/samples/fonts.jpg)
 
+裝飾、瘋狂手寫與浸水（第三版）：
+
+| 血跡與血手印（特寫；上排乾涸、新鮮） | 越寫越亂：強度 60 | 強度 100 | 同一句寫滿整頁 |
+| --- | --- | --- | --- |
+| ![](docs/samples/decorations-closeup.jpg) | ![](docs/samples/madness-60.jpg) | ![](docs/samples/madness-100.jpg) | ![](docs/samples/madness-fill.jpg) |
+
+| 浸水程度 50 | 浸水程度 90 | 特寫：沒浸水／50／90 |
+| --- | --- | --- |
+| ![](docs/samples/water-50.jpg) | ![](docs/samples/water-90.jpg) | ![](docs/samples/water-strength-closeup.jpg) |
+
 更多範例（每種效果各一張）在 [`docs/samples/`](docs/samples/)。
 
 ## 道具種類

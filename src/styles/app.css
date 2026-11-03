@@ -624,3 +624,46 @@ textarea:focus-visible {
   gap: 0.4rem;
   font-size: 0.85rem;
 }
+
+/* ---------- 第四版：整版報紙的區塊設定面板 ---------- */
+
+.block-panel {
+  border-color: var(--ui-accent);
+  background: #fffaf2;
+}
+
+.block-panel legend {
+  font-weight: 700;
+  color: var(--ui-accent-dark);
+}
+
+.block-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+
+.block-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 6px 10px;
+}
+
+.block-field {
+  display: grid;
+  gap: 2px;
+}
+
+.block-field select,
+.block-field input {
+  width: 100%;
+  border: 1px solid var(--ui-line);
+  border-radius: 5px;
+  padding: 4px 6px;
+  background: #fffdf9;
+}
+
+.btn-danger {
+  color: var(--ui-error);
+}

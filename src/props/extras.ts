@@ -3,6 +3,7 @@
 
 import type { FillerItem } from '../data/fillers.ts';
 import type { Point } from '../lib/geometry.ts';
+import { EMPTY_BLOCK_EXTRAS, sanitizeBlockExtras, type BlockExtras } from '../lib/newspaper/blockstyle.ts';
 import { isValidSeed } from '../lib/random.ts';
 
 export const NEWS_ITEM_KINDS = [
@@ -70,6 +71,8 @@ export interface NewspaperExtras extends PropExtras {
   readonly items: readonly NewsItem[];
   readonly locked: readonly FillerItem[];
   readonly removed: readonly string[];
+  /** 第四版：整版各區塊的個別設定（新增、刪除、順序、樣式、鎖定）。 */
+  readonly blocks: BlockExtras;
 }
 
 export interface ExtrasState {
@@ -94,7 +97,7 @@ export const LIMITS = {
 export function defaultExtras(): ExtrasState {
   const empty: PropExtras = { crop: null, decorations: [] };
   return {
-    newspaper: { ...empty, items: [], locked: [], removed: [] },
+    newspaper: { ...empty, items: [], locked: [], removed: [], blocks: EMPTY_BLOCK_EXTRAS },
     telegram: { ...empty },
     letter: { ...empty },
     card: { ...empty },
@@ -219,6 +222,7 @@ export function sanitizeExtras(input: unknown, labels: Readonly<Record<keyof Ext
     items: sanitizeList(np['items'], LIMITS.items, sanitizeNewsItem, '自己加的新聞與啟事', warnings),
     locked: sanitizeList(np['locked'], LIMITS.locked, sanitizeFiller, '鎖定的填版素材', warnings),
     removed: sanitizeList(np['removed'], LIMITS.removed, (x) => (typeof x === 'string' && ID_RE.test(x) ? x : null), '刪除的填版素材', warnings),
+    blocks: blocksOf(np['blocks'], warnings),
   };
   return {
     extras: {
@@ -229,6 +233,12 @@ export function sanitizeExtras(input: unknown, labels: Readonly<Record<keyof Ext
     },
     warnings,
   };
+}
+
+function blocksOf(v: unknown, warnings: string[]): BlockExtras {
+  const { blocks, dropped } = sanitizeBlockExtras(v);
+  if (dropped > 0) warnings.push(`整版區塊的設定有 ${dropped} 項格式不符或超過上限，已略過。`);
+  return blocks;
 }
 
 let counter = 0;

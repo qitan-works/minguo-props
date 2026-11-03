@@ -38,6 +38,8 @@ export interface FlowLine {
   readonly length: number;
   readonly glyphs: readonly Glyph[];
   readonly align: 'start' | 'center';
+  /** 割注：這一行裡並排兩小行（前一半在右、後一半在左）。 */
+  readonly split?: boolean;
 }
 
 export interface FlowItem {
@@ -52,6 +54,17 @@ export interface FlowItem {
   readonly paragraphs: readonly string[];
   /** 表列（船期、物價）：每段一行，不縮排。 */
   readonly rows?: boolean;
+  /** 第四版：自訂標題的字高與直排時佔幾行寬（區塊的標題大小五級）。 */
+  readonly headline?: { readonly span: number; readonly size: number };
+  /** 第四版：內文字高；split 為割注（一行裡兩小行）。 */
+  readonly body?: { readonly size: number; readonly split: boolean };
+}
+
+/** 一行放得下幾個字：字高 size；割注是兩小行。 */
+export function lineCapacity(cap: number, body: FlowItem['body']): number {
+  const size = body?.size ?? 1;
+  const per = Math.max(1, Math.floor(cap / size + 1e-9));
+  return body?.split ? per * 2 : per;
 }
 
 export const HEADLINE = {
@@ -131,7 +144,7 @@ export function layoutItem(
   // 標題
   const title = headlinePunctuation(toFullWidth(item.title.trim()), mode);
   if (title) {
-    const { span, size } = HEADLINE[item.level];
+    const { span, size } = item.headline ?? HEADLINE[item.level];
     const actualSpan = Math.min(span, Math.max(1, remain()));
     const group = slots.slice(i, i + actualSpan);
     const cap = Math.min(...group.map((s) => s.cap));
@@ -177,18 +190,20 @@ export function layoutItem(
       truncated = true;
       break;
     }
+    const bodySize = item.body?.size ?? 1;
+    const split = item.body?.split === true;
     if (item.rows) {
       const slot = slots[i] as ColumnSlot;
-      lines.push({ ...base, role: 'row', slot: i, span: 1, size: 1, top: slot.top, length: slot.cap, glyphs: glyphs.slice(0, slot.cap), align: 'start' });
+      lines.push({ ...base, role: 'row', slot: i, span: 1, size: bodySize, top: slot.top, length: slot.cap, glyphs: glyphs.slice(0, lineCapacity(slot.cap, item.body)), align: 'start', ...(split ? { split } : {}) });
       i++;
       continue;
     }
     const indented: Glyph[] = [{ ch: '　' }, ...glyphs];
-    const caps = slots.slice(i).map((s) => s.cap);
+    const caps = slots.slice(i).map((s) => lineCapacity(s.cap, item.body));
     const { lines: filled, used } = fillColumns(indented, caps);
     for (const g of filled) {
       const slot = slots[i] as ColumnSlot;
-      lines.push({ ...base, role: 'body', slot: i, span: 1, size: 1, top: slot.top, length: slot.cap, glyphs: g, align: 'start' });
+      lines.push({ ...base, role: 'body', slot: i, span: 1, size: bodySize, top: slot.top, length: slot.cap, glyphs: g, align: 'start', ...(split ? { split } : {}) });
       i++;
     }
     if (used < indented.length) {
@@ -204,7 +219,7 @@ export function layoutItem(
     if (last < 0) return null;
     const line = lines[last] as FlowLine;
     const mark = Array.from(truncationMark(mode)).map((ch) => ({ ch }));
-    const keep = Math.max(0, Math.min(line.glyphs.length, line.length - mark.length));
+    const keep = Math.max(0, Math.min(line.glyphs.length, lineCapacity(line.length, item.body) - mark.length));
     lines[last] = { ...line, glyphs: [...line.glyphs.slice(0, keep), ...mark] };
     lines.length = last + 1;
     i = line.slot + 1;
@@ -218,6 +233,8 @@ export interface FlowOptions {
   readonly lookahead?: number;
   /** 補最後一兩行用的一行小訊（依序取用，會被移出佇列）。 */
   readonly tiny: FlowItem[];
+  /** 第四版：區塊的內文樣式，套到排進這個區塊的每一則。 */
+  readonly body?: FlowItem['body'];
 }
 
 export interface FlowResult {
@@ -225,6 +242,10 @@ export interface FlowResult {
   /** 用到的素材（依排入順序）。 */
   readonly used: string[];
   readonly truncated: string[];
+}
+
+function withBody(item: FlowItem, body: FlowItem['body']): FlowItem {
+  return body && !item.body ? { ...item, body } : item;
 }
 
 /** 一則至少要幾行才值得截斷排入。 */
@@ -241,7 +262,7 @@ export function flowRegion(slots: readonly ColumnSlot[], queue: FlowItem[], opti
   while (i < slots.length && guard++ < 400) {
     let placed = false;
     for (let k = 0; k < Math.min(lookahead, queue.length); k++) {
-      const item = queue[k] as FlowItem;
+      const item = withBody(queue[k] as FlowItem, options.body);
       const laid = layoutItem(item, slots, i, options.mode, false);
       if (laid && laid.used > 0) {
         lines.push(...laid.lines);
@@ -255,13 +276,14 @@ export function flowRegion(slots: readonly ColumnSlot[], queue: FlowItem[], opti
     if (placed) continue;
     if (slots.length - i >= MIN_TRUNCATE_SLOTS && queue.length > 0) {
       const k = queue.findIndex((q) => !q.rows);
-      const item = queue[k >= 0 ? k : 0] as FlowItem;
+      const original = queue[k >= 0 ? k : 0] as FlowItem;
+      const item = withBody(original, options.body);
       const laid = layoutItem(item, slots, i, options.mode, true);
       if (laid && laid.used > 0) {
         lines.push(...laid.lines);
         used.push(item.id);
         if (laid.truncated) truncated.push(item.id);
-        queue.splice(queue.indexOf(item), 1);
+        queue.splice(queue.indexOf(original), 1);
         i += laid.used;
         continue;
       }
@@ -273,8 +295,9 @@ export function flowRegion(slots: readonly ColumnSlot[], queue: FlowItem[], opti
       i++;
       continue;
     }
-    const glyphs = glyphsOf(tiny.paragraphs.join('　'), options.mode).slice(0, slot.cap);
-    lines.push({ itemId: tiny.id, source: tiny.source, role: 'tiny', slot: i, span: 1, size: 1, top: slot.top, length: slot.cap, glyphs, align: 'start' });
+    const glyphs = glyphsOf(tiny.paragraphs.join('　'), options.mode).slice(0, lineCapacity(slot.cap, options.body));
+    const size = options.body?.size ?? 1;
+    lines.push({ itemId: tiny.id, source: tiny.source, role: 'tiny', slot: i, span: 1, size, top: slot.top, length: slot.cap, glyphs, align: 'start', ...(options.body?.split ? { split: true } : {}) });
     used.push(tiny.id);
     i++;
   }

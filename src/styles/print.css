@@ -144,6 +144,10 @@ html[data-page='card-portrait'] body {
     outline: none !important;
   }
 
+  .nr-outline {
+    display: none !important;
+  }
+
   .sheet-scaler > .sheet {
     position: relative;
     transform: none;

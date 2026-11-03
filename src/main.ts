@@ -17,7 +17,7 @@ import { parsePreviewZoom, previewScale, serializePreviewZoom, wheelDirection, z
 import { applyPreset, pickConditions } from './props/conditions.ts';
 import { eraFontPatch, eraPatch, isEra } from './props/eras.ts';
 import { startCropDrawing, type CropSession, type CropTool } from './ui/crop.ts';
-import type { Decoration } from './props/extras.ts';
+import { newId, type Decoration } from './props/extras.ts';
 import { findOverflow } from './render/sheet.ts';
 import { renderTelegram, type TelegramRender } from './render/telegram.ts';
 import {
@@ -35,7 +35,11 @@ import {
 import { h } from './ui/dom.ts';
 import { buildForm, type FieldValue } from './ui/form.ts';
 import { buildItemsEditor } from './ui/items.ts';
-import { closePopover, showPopover } from './ui/popover.ts';
+import { closePopover } from './ui/popover.ts';
+import { buildBlockPanel, type BlockAction } from './ui/blocks.ts';
+import { EMPTY_BLOCK_EXTRAS, mergeStyle, type BlockEdit, type BlockExtras, type BlockStyle } from './lib/newspaper/blockstyle.ts';
+import { contentSeed, snapshotContent } from './lib/newspaper/content.ts';
+import { FONT_OPTIONS } from './fonts.ts';
 
 const STORAGE_KEY = 'minguo-props:v1';
 const store = createSafeStore(() => window.localStorage, STORAGE_KEY);
@@ -68,6 +72,8 @@ const els = {
 
 let codebook: Codebook | null = null;
 let lastFull: FullPageRender | null = null;
+/** 整版上點選的區塊（只在畫面上標示，不存檔）。 */
+let selectedBlock: string | null = null;
 let selectedDeco: string | null = null;
 let codebookFailed = false;
 let saveTimer: number | undefined;
@@ -212,6 +218,8 @@ function rebuildForm(): void {
   });
   refreshForm = form.refresh;
   els.form.replaceChildren(form.root);
+  const panel = kind === 'newspaper' ? blockPanel() : null;
+  if (panel) els.form.prepend(panel);
   els.form.appendChild(cropEditor(kind));
   els.form.appendChild(
     buildDecorationEditor({
@@ -360,8 +368,15 @@ function renderPreview(): void {
     case 'newspaper': {
       const np = state.props.newspaper;
       if (np.fit === 'full' || np.fit === 'cut') {
-        lastFull = renderNewspaperFull(np, state.extras.newspaper);
+        lastFull = renderNewspaperFull(np, state.extras.newspaper, selectedBlock);
         sheet = lastFull.sheet;
+        if (selectedBlock && !lastFull.layout.blocks.some((b) => b.id === selectedBlock)) {
+          selectedBlock = null;
+          queueMicrotask(() => rebuildForm());
+        } else if (selectedBlock && els.form.querySelector('#block-panel')?.getAttribute('data-block-id') !== selectedBlock) {
+          // 新增或複製的區塊要排出來之後才有設定面板
+          queueMicrotask(() => rebuildForm());
+        }
       } else {
         sheet = renderNewspaper(np, state.extras.newspaper.crop);
       }
@@ -535,62 +550,152 @@ els.clearButton.addEventListener('click', () => {
   setStatus('已清除本機保存的內容。');
 });
 
-// ---- 整版：點一則素材可鎖定或刪除 ----
+// ---- 整版：點一個區塊，左邊出現它自己的設定 ----
+
+function blockExtras(): BlockExtras {
+  return state.extras.newspaper.blocks ?? EMPTY_BLOCK_EXTRAS;
+}
+
+function commitBlocks(next: BlockExtras, select: string | null = selectedBlock): void {
+  state = updateExtras(state, 'newspaper', { blocks: next });
+  selectedBlock = select;
+  scheduleSave();
+  queueRender();
+  rebuildForm();
+}
+
+/** 改一個區塊的樣式：只把改過的欄位併進它的修改。 */
+function editBlock(id: string, patch: Partial<BlockStyle> & Partial<Pick<BlockEdit, 'locked' | 'content' | 'contentSeed'>>): void {
+  const b = blockExtras();
+  const old = b.edits.find((e) => e.id === id);
+  const next: BlockEdit = { ...(old ?? { id }), ...patch, id };
+  commitBlocks({ ...b, edits: [...b.edits.filter((e) => e.id !== id), next] });
+}
+
+function blockAction(id: string, action: BlockAction): void {
+  const b = blockExtras();
+  const placed = lastFull?.layout.blocks.find((x) => x.id === id);
+  const order = (lastFull?.blocks ?? []).map((x) => x.id);
+  switch (action) {
+    case 'close':
+      selectedBlock = null;
+      queueRender();
+      rebuildForm();
+      return;
+    case 'add': {
+      const nid = newId('u');
+      const at = order.indexOf(id);
+      commitBlocks({ ...b, added: [...b.added, { id: nid, kind: 'news', after: id }], order: b.order.length ? [...order.slice(0, at + 1), nid, ...order.slice(at + 1)] : b.order }, nid);
+      return;
+    }
+    case 'copy': {
+      if (!placed) return;
+      const nid = newId('u');
+      const at = order.indexOf(id);
+      const { kind, ...rest } = placed.style;
+      commitBlocks(
+        {
+          ...b,
+          added: [...b.added, { id: nid, kind, after: id }],
+          edits: [...b.edits, { id: nid, kind, ...rest }],
+          order: b.order.length ? [...order.slice(0, at + 1), nid, ...order.slice(at + 1)] : b.order,
+        },
+        nid,
+      );
+      return;
+    }
+    case 'delete':
+      commitBlocks(
+        {
+          edits: b.edits.filter((e) => e.id !== id),
+          added: b.added.filter((a) => a.id !== id),
+          removed: b.added.some((a) => a.id === id) ? b.removed : [...b.removed.filter((r) => r !== id), id],
+          order: b.order.filter((o) => o !== id),
+        },
+        null,
+      );
+      return;
+    case 'lock': {
+      if (!placed || !lastFull) return;
+      const np = state.props.newspaper;
+      editBlock(id, { ...placed.style, locked: true, content: snapshotContent(placed.usedIds, lastFull.pool), contentSeed: contentSeed(np.fillSeed, id) });
+      return;
+    }
+    case 'unlock': {
+      const old = b.edits.find((e) => e.id === id);
+      if (!old) return;
+      const { locked: _l, content: _c, contentSeed: _s, ...rest } = old;
+      commitBlocks({ ...b, edits: [...b.edits.filter((e) => e.id !== id), rest] });
+      return;
+    }
+    case 'up':
+    case 'down': {
+      const at = order.indexOf(id);
+      const to = action === 'up' ? at - 1 : at + 1;
+      if (at < 0 || to < 0 || to >= order.length) return;
+      const next = [...order];
+      [next[at], next[to]] = [next[to] as string, next[at] as string];
+      commitBlocks({ ...b, order: next });
+      return;
+    }
+    case 'reset':
+      commitBlocks({ ...b, edits: b.edits.filter((e) => e.id !== id) });
+      return;
+  }
+}
+
+function blockPanel(): HTMLElement | null {
+  const np = state.props.newspaper;
+  if (!selectedBlock || !lastFull || (np.fit !== 'full' && np.fit !== 'cut')) return null;
+  const placed = lastFull.layout.blocks.find((x) => x.id === selectedBlock);
+  if (!placed) return null;
+  const id = placed.id;
+  const edit = blockExtras().edits.find((e) => e.id === id);
+  const head = placed.lines.find((l) => l.itemId === placed.headItemId && (l.role === 'h1' || l.role === 'h2' || l.role === 'h3'));
+  return buildBlockPanel({
+    id,
+    // 畫面還沒重畫之前，先把最新的修改套上去
+    style: mergeStyle(placed.style, edit),
+    filler: placed.filler,
+    locked: edit?.locked === true,
+    edited: !!edit,
+    titlePreview: placed.band?.lines.map((l) => l.text).join('') ?? head?.glyphs.map((g) => g.ch).join('') ?? placed.ad?.big ?? placed.table?.title ?? placed.toc?.title ?? placed.picture?.caption ?? '',
+    fontOptions: FONT_OPTIONS,
+    onStyle: (patch) => editBlock(id, patch),
+    onAction: (action) => blockAction(id, action),
+  });
+}
+
+/** 預覽上的一點落在哪個區塊（依版面格子換算）。 */
+function blockAtPoint(clientX: number, clientY: number): string | null {
+  const paper = els.stage.querySelector<HTMLElement>('.paper');
+  if (!paper || !lastFull) return null;
+  const box = paper.getBoundingClientRect();
+  const perMm = box.width / (paper.offsetWidth / PX_PER_MM);
+  const x = (clientX - box.left) / perMm;
+  const y = (clientY - box.top) / perMm;
+  const { geometry: g, layout } = lastFull;
+  const col = Math.floor((g.area.x + g.area.w - x) / g.pitch);
+  const row = Math.floor((y - g.area.y) / g.cell);
+  if (col < 0 || row < 0 || col >= layout.cols || row >= layout.rows) return null;
+  const index = layout.owner[row * layout.cols + col] ?? -1;
+  return index >= 0 ? (layout.blocks[index]?.id ?? null) : null;
+}
 
 els.stage.addEventListener('click', (event) => {
+  closePopover();
   if (event.target instanceof Element && event.target.closest('.deco, .crop-overlay')) return;
-  const target = event.target instanceof Element ? event.target.closest<HTMLElement>('.nb[data-block-id]') : null;
-  if (!target || !lastFull || state.active !== 'newspaper') {
-    closePopover();
-    return;
-  }
-  const id = target.dataset['blockId'] ?? '';
-  const source = target.dataset['source'];
-  const box = els.stage.getBoundingClientRect();
-  const x = event.clientX - box.left + els.stage.scrollLeft;
-  const y = event.clientY - box.top + els.stage.scrollTop;
-  const extras = state.extras.newspaper;
-  const commit = (patch: Parameters<typeof updateExtras<'newspaper'>>[2]): void => {
-    state = updateExtras(state, 'newspaper', patch);
-    queueRender();
-    scheduleSave();
-  };
-  if (source === 'filler') {
-    const baseId = id.split('#')[0] ?? id;
-    const isLocked = extras.locked.some((l) => l.id === baseId);
-    const item = lastFull.pool.byId.get(baseId);
-    showPopover(els.stage, x, y, '填版素材', [
-      isLocked
-        ? { label: '解除鎖定', run: () => commit({ locked: extras.locked.filter((l) => l.id !== baseId) }) }
-        : {
-            label: '鎖定（換一批時保留）',
-            run: () => {
-              if (item) commit({ locked: [...extras.locked, item].slice(-60) });
-              else setStatus('這一行小訊無法鎖定，可以改用「我的新聞與啟事」自己加。', 'warn');
-            },
-          },
-      {
-        label: '刪除這一塊',
-        run: () =>
-          commit({
-            locked: extras.locked.filter((l) => l.id !== baseId),
-            removed: [...extras.removed.filter((r) => r !== baseId), baseId].slice(-500),
-          }),
-      },
-    ]);
-  } else if (id === 'main' || id === 'photo' || id === 'second') {
-    showPopover(els.stage, x, y, '這一則在左邊表單的「新聞」「照片」「短訊」欄位編輯', []);
-  } else {
-    showPopover(els.stage, x, y, '我的新聞與啟事', [
-      {
-        label: '刪除這一則',
-        run: () => {
-          commit({ items: extras.items.filter((i) => i.id !== id) });
-          rebuildForm();
-        },
-      },
-    ]);
-  }
+  if (state.active !== 'newspaper' || !lastFull) return;
+  const target = event.target instanceof Element ? event.target.closest<HTMLElement>('.nr[data-region-id]') : null;
+  // 點在空心字、框線、留白上時，依座標找出是哪個區塊
+  const id = target?.dataset['regionId'] ?? blockAtPoint(event.clientX, event.clientY);
+  if (!id || id === selectedBlock) return;
+  selectedBlock = id;
+  queueRender();
+  rebuildForm();
+  // 寬螢幕：表單欄捲回最上面，看得到區塊設定
+  if (wideLayout.matches) els.editor.scrollTo({ top: 0, behavior: 'smooth' });
+  setStatus('已選取一個區塊，設定在左邊表單最上方。');
 });
 
 // ---- 裝飾：拖曳移動、Alt＋滾輪縮放、Alt＋Shift＋滾輪旋轉（沒按 Alt 時滾輪一律捲動） ----

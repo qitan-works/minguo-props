@@ -47,6 +47,18 @@ export function isPaperKey(value: string): value is PaperKey {
   return Object.prototype.hasOwnProperty.call(PAPER_SIZES, value);
 }
 
+const FONT_ERA_OPTIONS = [
+  { value: 'custom', label: '自訂' },
+  { value: '1910s', label: '1910 年代（行書、明體）' },
+  { value: '1920s', label: '1920 年代（顏楷、超明、鋼筆行楷）' },
+  { value: '1930s', label: '1930 年代（特黑、仿宋、清松行楷）' },
+] as const satisfies readonly Option[];
+
+/** 電報、信箋、名片用：先選一組年代字型，再個別調整。 */
+export function fontEraField<G extends string>(group: G) {
+  return { key: 'fontEra', type: 'select', label: '字型年代組合', options: FONT_ERA_OPTIONS, group, hint: '一次換掉下面五個字型；個別調整後顯示為「自訂」。' } as const;
+}
+
 /** 每個道具的報頭、標題、內文、廣告大字、手寫部分可分別選字型。 */
 export function fontFields<G extends string>(group: G) {
   return [

@@ -1,6 +1,6 @@
 // 電報：欄位定義與預設內容。
 
-import { fontFields, paperOptions } from './common.ts';
+import { fontEraField, fontFields, paperOptions } from './common.ts';
 import { conditionDefaults, conditionFields } from './conditions.ts';
 import type { DataOf, Field } from './schema.ts';
 
@@ -60,6 +60,7 @@ export const telegramFields = [
     ],
   },
 
+  fontEraField('字型'),
   ...fontFields('字型'),
   ...conditionFields('紙張狀況', '更多痕跡'),
 ] as const satisfies readonly Field[];
@@ -83,6 +84,7 @@ export const telegramDefaults: TelegramData = {
   yunmuAlternate: false,
   dropPunctuation: true,
   codeDisplay: 'both',
+  fontEra: 'custom',
   fontMasthead: 'noto-serif',
   fontTitle: 'noto-serif',
   fontBody: 'noto-serif',

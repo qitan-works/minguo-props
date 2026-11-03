@@ -12,7 +12,7 @@ import { drawDecorations } from './render/decorations.ts';
 import { buildDecorationEditor } from './ui/decorations.ts';
 import { PX_PER_MM } from './lib/geometry.ts';
 import { applyPreset, pickConditions } from './props/conditions.ts';
-import { eraPatch, isEra } from './props/eras.ts';
+import { eraFontPatch, eraPatch, isEra } from './props/eras.ts';
 import { startCropDrawing, type CropSession, type CropTool } from './ui/crop.ts';
 import type { Decoration } from './props/extras.ts';
 import { findOverflow } from './render/sheet.ts';
@@ -163,6 +163,24 @@ function rebuildForm(): void {
         queueRender();
         scheduleSave();
         rebuildForm();
+        return;
+      }
+      if (key === 'fontEra' && isEra(String(value))) {
+        // 字型年代組合：一次改五個字型，再重建表單
+        const patch = eraFontPatch(String(value) as Parameters<typeof eraFontPatch>[0]);
+        state = updateProp(state, kind, { fontEra: value, ...(patch ?? {}) } as never);
+        queueRender();
+        scheduleSave();
+        rebuildForm();
+        return;
+      }
+      if (kind !== 'newspaper' && ['fontMasthead', 'fontTitle', 'fontBody', 'fontAd', 'fontHand'].includes(key)) {
+        state = updateProp(state, kind, { [key]: value, fontEra: 'custom' } as never);
+        const select = document.querySelector<HTMLSelectElement>('#prop-form select[id^="f-fontEra-"]');
+        if (select) select.value = 'custom';
+        refreshForm?.(currentValues());
+        queueRender();
+        scheduleSave();
         return;
       }
       if (kind === 'newspaper' && ['punctuation', 'mastheadLayout', 'press', 'fontMasthead', 'fontTitle', 'fontBody', 'fontAd'].includes(key)) {

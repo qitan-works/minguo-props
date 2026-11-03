@@ -29,6 +29,9 @@ export const FONT_IDS = {
   yankai: 'wang-yankai',
   xing: 'wang-xing',
   pen: 'wang-pen',
+  jason5: 'jason-5',
+  jason7: 'jason-7',
+  jason8: 'jason-8',
   notoSerif: 'noto-serif',
   cactus: 'cactus',
   lxgw: 'lxgw',
@@ -36,6 +39,8 @@ export const FONT_IDS = {
 
 export interface EraFonts {
   readonly masthead: readonly string[];
+  /** 手寫（信箋正文、電報譯文、名片上的手寫字）。 */
+  readonly hand: readonly string[];
   readonly title: readonly string[];
   readonly body: readonly string[];
   readonly ad: readonly string[];
@@ -56,6 +61,7 @@ export const ERA_SETTINGS: Readonly<
     press: 72,
     fonts: {
       masthead: [F.xing, F.yankai, F.lxgw],
+      hand: [F.xing, F.lxgw],
       title: [F.chaoming, F.teming, F.cactus, F.notoSerif],
       body: [F.ming, F.notoSerif],
       ad: [F.teming, F.chaoming, F.notoSerif],
@@ -70,6 +76,7 @@ export const ERA_SETTINGS: Readonly<
     press: 58,
     fonts: {
       masthead: [F.yankai, F.xing, F.lxgw],
+      hand: [F.pen, F.xing, F.lxgw],
       title: [F.chaoming, F.teming, F.cactus, F.notoSerif],
       body: [F.ming, F.notoSerif],
       ad: [F.teming, F.li, F.notoSerif],
@@ -84,6 +91,7 @@ export const ERA_SETTINGS: Readonly<
     press: 42,
     fonts: {
       masthead: [F.yankai, F.xing, F.lxgw],
+      hand: [F.jason5, F.pen, F.lxgw],
       title: [F.tehei, F.chaoming, F.notoSerif],
       body: [F.fangsong, F.ming, F.notoSerif],
       ad: [F.tehei, F.chaoming, F.notoSerif],
@@ -123,6 +131,29 @@ export function eraPatch(era: EraKey): EraPatch | null {
     fontTitle: resolveFont(s.fonts.title),
     fontBody: resolveFont(s.fonts.body),
     fontAd: resolveFont(s.fonts.ad),
+  };
+}
+
+export interface EraFontPatch {
+  readonly fontEra: EraKey;
+  readonly fontMasthead: string;
+  readonly fontTitle: string;
+  readonly fontBody: string;
+  readonly fontAd: string;
+  readonly fontHand: string;
+}
+
+/** 電報、信箋、名片的「字型年代組合」：只改五個字型角色。 */
+export function eraFontPatch(era: EraKey): EraFontPatch | null {
+  if (era === 'custom') return null;
+  const f = ERA_SETTINGS[era].fonts;
+  return {
+    fontEra: era,
+    fontMasthead: resolveFont(f.masthead),
+    fontTitle: resolveFont(f.title),
+    fontBody: resolveFont(f.body),
+    fontAd: resolveFont(f.ad),
+    fontHand: resolveFont(f.hand),
   };
 }
 

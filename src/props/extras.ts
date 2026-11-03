@@ -125,7 +125,14 @@ export function sanitizeNewsItem(v: unknown): NewsItem | null {
   const title = cleanText(v['title'], LIMITS.title);
   const body = cleanText(v['body'], LIMITS.body);
   if (id === null || kind === null || title === null || body === null) return null;
-  return { id, kind, title, body };
+  const optional = (key: 'subtitle' | 'price' | 'maker'): string | undefined => {
+    const value = cleanText(v[key], LIMITS.title * 2);
+    return value ? value : undefined;
+  };
+  const subtitle = optional('subtitle');
+  const price = optional('price');
+  const maker = optional('maker');
+  return { id, kind, title, body, ...(subtitle ? { subtitle } : {}), ...(price ? { price } : {}), ...(maker ? { maker } : {}) };
 }
 
 const FILLER_KINDS = new Set(['news', 'short', 'ad', 'notice', 'list']);

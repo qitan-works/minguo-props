@@ -1,7 +1,7 @@
 // 報紙剪報的版面：直排（writing-mode: vertical-rl）、分段欄線、報頭或報眉。
 
 import { formatMinguoDate, parseIsoDate } from '../lib/minguo.ts';
-import { PAPER_SIZES, isPaperKey } from '../props/common.ts';
+import { PAPER_SIZES, isPaperKey, fontsOf } from '../props/common.ts';
 import type { NewspaperData } from '../props/newspaper.ts';
 import type { Polygon } from '../lib/geometry.ts';
 import { pickConditions } from '../props/conditions.ts';
@@ -28,7 +28,7 @@ export function renderNewspaper(data: NewspaperData, crop: Polygon | null = null
     width,
     height,
     conditions: pickConditions(data),
-    fonts: { title: data.fontTitle, body: data.fontBody, hand: data.fontHand },
+    fonts: fontsOf(data),
     roughEdge: data.clipEdge,
     crop,
     className: 'np-paper',

@@ -128,7 +128,8 @@ html[data-page='card-portrait'] body {
     height: auto !important;
   }
 
-  .nf .nb {
+  .nf .nb,
+  .nf .nb > * {
     outline: none !important;
   }
 

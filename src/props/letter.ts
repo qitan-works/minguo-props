@@ -1,6 +1,6 @@
 // 信箋：欄位定義與預設內容。
 
-import { fontFields, paperOptions } from './common.ts';
+import { fontEraField, fontFields, paperOptions } from './common.ts';
 import { FONTS, FONT_OPTIONS } from '../fonts.ts';
 import { conditionDefaults, conditionFields } from './conditions.ts';
 import type { DataOf, Field } from './schema.ts';
@@ -80,6 +80,7 @@ export const letterFields = [
     hint: '越亂的後半段改用這個手寫字型，例如從鋼筆行楷換成清松手寫體 7 飄逸。',
     showIf: { key: 'madness', in: MADNESS_ON },
   },
+  fontEraField('字型'),
   ...fontFields('字型'),
   ...conditionFields('紙張狀況', '更多痕跡'),
 ] as const satisfies readonly Field[];
@@ -109,8 +110,11 @@ export const letterDefaults: LetterData = {
   madOverflow: false,
   madFillPage: false,
   madFont: MAD_FONT_DEFAULT,
+  fontEra: 'custom',
+  fontMasthead: 'noto-serif',
   fontTitle: 'noto-serif',
   fontBody: 'noto-serif',
+  fontAd: 'noto-serif',
   fontHand: HAND_DEFAULT,
   ...conditionDefaults({ aging: 'light', folds: true, foldStyle: 'thirds', stains: true, effectSeed: 61493 }),
 };

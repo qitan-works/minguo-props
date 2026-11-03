@@ -4,7 +4,7 @@ import { formatMinguoDate, minguoYearNumeral, parseIsoDate, toMinguoYear } from 
 import { toChineseNumber } from '../lib/numerals.ts';
 import { annotateTelegram, countWords, type Codebook, type TelegramCell } from '../lib/telegraph.ts';
 import { telegramDateCode } from '../lib/yunmu.ts';
-import { PAPER_SIZES, isPaperKey } from '../props/common.ts';
+import { PAPER_SIZES, isPaperKey, fontsOf } from '../props/common.ts';
 import type { TelegramData } from '../props/telegram.ts';
 import type { Polygon } from '../lib/geometry.ts';
 import { pickConditions } from '../props/conditions.ts';
@@ -83,7 +83,7 @@ export function renderTelegram(data: TelegramData, book: Codebook | null, crop: 
     width: size.width,
     height: size.height,
     conditions: pickConditions(data),
-    fonts: { title: data.fontTitle, body: data.fontBody, hand: data.fontHand },
+    fonts: fontsOf(data),
     crop,
     className: 'tg-paper',
   });

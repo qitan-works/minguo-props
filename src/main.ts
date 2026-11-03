@@ -14,6 +14,7 @@ import { placeDecoration } from './lib/decorations.ts';
 import { measureMarks } from './render/effects.ts';
 import { PX_PER_MM } from './lib/geometry.ts';
 import { applyPreset, pickConditions } from './props/conditions.ts';
+import { eraFontPatch, eraPatch, isEra } from './props/eras.ts';
 import { startCropDrawing, type CropSession, type CropTool } from './ui/crop.ts';
 import type { Decoration } from './props/extras.ts';
 import { findOverflow } from './render/sheet.ts';
@@ -155,6 +156,43 @@ function rebuildForm(): void {
         queueRender();
         scheduleSave();
         rebuildForm();
+        return;
+      }
+      if (key === 'era' && kind === 'newspaper' && isEra(String(value))) {
+        // 年代預設：一次改句讀、報頭位置、字型與印刷質感，再重建表單
+        const patch = eraPatch(String(value) as Parameters<typeof eraPatch>[0]);
+        state = updateProp(state, kind, { era: value, ...(patch ?? {}) } as never);
+        queueRender();
+        scheduleSave();
+        rebuildForm();
+        return;
+      }
+      if (key === 'fontEra' && isEra(String(value))) {
+        // 字型年代組合：一次改五個字型，再重建表單
+        const patch = eraFontPatch(String(value) as Parameters<typeof eraFontPatch>[0]);
+        state = updateProp(state, kind, { fontEra: value, ...(patch ?? {}) } as never);
+        queueRender();
+        scheduleSave();
+        rebuildForm();
+        return;
+      }
+      if (kind !== 'newspaper' && ['fontMasthead', 'fontTitle', 'fontBody', 'fontAd', 'fontHand'].includes(key)) {
+        state = updateProp(state, kind, { [key]: value, fontEra: 'custom' } as never);
+        const select = document.querySelector<HTMLSelectElement>('#prop-form select[id^="f-fontEra-"]');
+        if (select) select.value = 'custom';
+        refreshForm?.(currentValues());
+        queueRender();
+        scheduleSave();
+        return;
+      }
+      if (kind === 'newspaper' && ['punctuation', 'mastheadLayout', 'press', 'fontMasthead', 'fontTitle', 'fontBody', 'fontAd'].includes(key)) {
+        // 個別調整了年代預設管的欄位：年代改成「自訂」
+        state = updateProp(state, kind, { [key]: value, era: 'custom' } as never);
+        const eraSelect = document.querySelector<HTMLSelectElement>('#prop-form select[id^="f-era-"]');
+        if (eraSelect) eraSelect.value = 'custom';
+        refreshForm?.(currentValues());
+        queueRender();
+        scheduleSave();
         return;
       }
       state = updateProp(state, kind, { [key]: value } as never);

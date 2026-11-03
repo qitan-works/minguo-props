@@ -5,7 +5,7 @@
 // 輸出全部是紙面座標（公釐）的幾何資料，交給 src/render/effects.ts 畫出來；同一組輸入永遠得到同樣的結果。
 
 import { cutPolygon } from './cutline.ts';
-import { inflateRect, polygonBounds, rectPolygonRelation, rectToPolygon, rectsOverlap, type Point, type Polygon, type Rect } from './geometry.ts';
+import { inflateRect, pointInPolygon, polygonBounds, rectPolygonRelation, rectToPolygon, rectsOverlap, type Point, type Polygon, type Rect } from './geometry.ts';
 import { gaussianish, int, pick, range, rngFor, type Rng } from './random.ts';
 
 export const EDGE_STYLES = [
@@ -41,6 +41,8 @@ export interface ConditionSettings {
   readonly pinHoles: boolean;
   readonly water: string;
   readonly waterStrength: number;
+  /** 墨水暈開後偏藍或偏褐（第三版新增；舊存檔沒有時偏褐）。 */
+  readonly waterTint?: string;
   readonly folds: boolean;
   readonly foldStyle: string;
   readonly crumple: number;
@@ -98,8 +100,20 @@ export interface EffectPlan {
   readonly edge: EdgeStyle;
   /** 破洞：燒穿的洞、蟲蛀、圖釘孔。 */
   readonly holes: { readonly kind: 'burn' | 'worm' | 'pin'; readonly polygon: Point[] }[];
-  /** 浸水範圍（含避開保護區的洞，以 evenodd 規則填色）。 */
-  readonly water: { readonly polygons: Point[][]; readonly strength: number } | null;
+  /** 火燒的焦痕：紙邊（edge = burnt）與每個燒洞各一組，由外往內。 */
+  readonly char: { readonly edge: CharMarks | null; readonly holes: CharMarks[] };
+  /**
+   * 浸水範圍（含避開保護區的洞，以 evenodd 規則填色）、乾掉後留下的潮線、起皺的紋路與墨色偏向；
+   * soaked 是泡得最久的幾塊（互不重疊、不碰保護區），那裡的字暈得最開。
+   */
+  readonly water: {
+    readonly polygons: Point[][];
+    readonly strength: number;
+    readonly tides: Point[][];
+    readonly wrinkles: Point[][];
+    readonly tint: 'blue' | 'brown';
+    readonly soaked: Point[][];
+  } | null;
   /** 濕手抹糊的墨跡。 */
   readonly smudges: Point[][];
   /** 必毀區的濃墨塗抹（沒有火燒時用來毀掉那些字）。 */
@@ -115,6 +129,107 @@ export interface EffectPlan {
   readonly wax: { readonly blob: Point[]; readonly drip: Point[] }[];
   readonly pencil: (Box & { readonly text: string }) | null;
   readonly sun: { readonly side: 'left' | 'right' | 'top' | 'bottom'; readonly amount: number } | null;
+}
+
+/** 火燒的焦痕：由外往內的幾圈焦痕線（越外越黑），加上灰燼碎片與焦裂的細紋。 */
+export interface CharMarks {
+  /** 起點的線（紙邊或燒洞的邊）。 */
+  readonly edge: Point[];
+  /** 往紙面內縮 depth 公釐、帶起伏的線，依 depth 由大到小排列。 */
+  readonly bands: { readonly depth: number; readonly line: Point[] }[];
+  readonly flakes: { readonly polygon: Point[]; readonly ash: boolean }[];
+  readonly cracks: Point[][];
+}
+
+/** 焦痕帶的深度（公釐），由深到淺：淡黃漸層帶、褐色焦痕、深褐、焦黑。分十圈疊出漸層。 */
+export const CHAR_DEPTHS = [11, 9.2, 7.6, 6.2, 5, 3.9, 2.9, 2, 1.3, 0.7] as const;
+
+/** 沿封閉多邊形每隔 step 公釐取一點。 */
+export function resample(poly: readonly Point[], step: number): Point[] {
+  const out: Point[] = [];
+  for (let k = 0; k < poly.length; k++) {
+    const a = poly[k] as Point;
+    const b = poly[(k + 1) % poly.length] as Point;
+    const len = Math.hypot(b.x - a.x, b.y - a.y);
+    const n = Math.max(1, Math.round(len / step));
+    for (let i = 0; i < n; i++) out.push({ x: a.x + ((b.x - a.x) * i) / n, y: a.y + ((b.y - a.y) * i) / n });
+  }
+  return out;
+}
+
+function centroid(poly: readonly Point[]): Point {
+  let x = 0;
+  let y = 0;
+  for (const p of poly) {
+    x += p.x;
+    y += p.y;
+  }
+  return { x: x / Math.max(1, poly.length), y: y / Math.max(1, poly.length) };
+}
+
+/** 每一點朝「紙面」的法向量：紙邊朝內（朝中心），燒洞朝外（離開洞）。用前後各兩點平滑。 */
+function paperNormals(pts: readonly Point[], outward: boolean): Point[] {
+  const c = centroid(pts);
+  return pts.map((p, i) => {
+    const a = pts[(i - 2 + pts.length) % pts.length] as Point;
+    const b = pts[(i + 2) % pts.length] as Point;
+    const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+    let n = { x: -(b.y - a.y) / len, y: (b.x - a.x) / len };
+    const toward = (c.x - p.x) * n.x + (c.y - p.y) * n.y;
+    if ((toward < 0) !== outward) n = { x: -n.x, y: -n.y };
+    return n;
+  });
+}
+
+/** 沿線平滑起伏的係數（幾個不同頻率的正弦相加）。 */
+function waviness(rng: Rng, count: number): (i: number) => number {
+  const terms = [0, 1, 2].map(() => ({ f: int(rng, 2, Math.max(3, Math.round(count / 18))), p: range(rng, 0, Math.PI * 2), a: range(rng, 0.25, 0.5) }));
+  return (i) => terms.reduce((s, t) => s + t.a * Math.sin((i / count) * Math.PI * 2 * t.f + t.p), 0);
+}
+
+/** 點在不在任何保護區（多留 margin 公釐）裡。 */
+function inProtect(p: Point, protect: readonly Rect[], margin: number): boolean {
+  return protect.some((r) => p.x > r.x - margin && p.x < r.x + r.w + margin && p.y > r.y - margin && p.y < r.y + r.h + margin);
+}
+
+export function charMarks(rng: Rng, polygon: readonly Point[], outward: boolean, scale = 1, protect: readonly Rect[] = []): CharMarks {
+  const pts = resample(polygon, 2);
+  const normals = paperNormals(pts, outward);
+  const bands = CHAR_DEPTHS.map((depth) => {
+    const wave = waviness(rng, pts.length);
+    const d = depth * scale;
+    return {
+      depth: d,
+      line: pts.map((p, i) => {
+        const n = normals[i] as Point;
+        let reach = d * Math.max(0.2, 1 + wave(i) * 0.6);
+        // 焦痕不蓋到保護區（線索）：碰到就往紙邊縮回
+        for (let k = 0; k < 6 && reach > 0.05 && inProtect({ x: p.x + n.x * reach, y: p.y + n.y * reach }, protect, 1); k++) reach *= 0.5;
+        return { x: p.x + n.x * reach, y: p.y + n.y * reach };
+      }),
+    };
+  });
+  const flakes: CharMarks['flakes'] = [];
+  const cracks: Point[][] = [];
+  pts.forEach((p, i) => {
+    const n = normals[i] as Point;
+    if (i % 2 === 0 && rng() < 0.32) {
+      const at = range(rng, 0.2, 1.5) * scale;
+      if (inProtect({ x: p.x + n.x * at, y: p.y + n.y * at }, protect, 2)) return;
+      flakes.push({ polygon: blobPolygon(rng, p.x + n.x * at, p.y + n.y * at, range(rng, 0.25, 1) * scale, 0.5, 9), ash: rng() < 0.35 });
+    }
+    if (rng() < 0.08) {
+      const a = Math.atan2(n.y, n.x) + range(rng, -0.6, 0.6);
+      const len = range(rng, 1.2, 3.6) * scale;
+      const line: Point[] = [];
+      for (let k = 0; k <= 4; k++) {
+        const r = 0.3 + (len * k) / 4;
+        line.push({ x: p.x + Math.cos(a) * r + range(rng, -0.25, 0.25), y: p.y + Math.sin(a) * r + range(rng, -0.25, 0.25) });
+      }
+      cracks.push(line);
+    }
+  });
+  return { edge: pts, bands, flakes, cracks };
 }
 
 function isEdge(v: string): v is EdgeStyle {
@@ -481,7 +596,57 @@ export function planEffects(input: PlanInput): EffectPlan {
       }));
     }
     const holesInWater = input.protect.filter((r) => rectPolygonRelation(inflateRect(r, 1.2), region) !== 'outside').map((r) => rectToPolygon(inflateRect(r, 1.5)));
-    water = { polygons: [region, ...holesInWater], strength: Math.max(0, Math.min(100, s.waterStrength)) };
+    // 乾掉後的潮線：從水漬邊往裡幾圈，帶起伏
+    const edgePts = resample(region, 2.5);
+    const normals = paperNormals(edgePts, false);
+    const tides = [1.6, 3.8, 6.8].map((depth) => {
+      const wave = waviness(rng, edgePts.length);
+      return edgePts.map((p, i) => {
+        const n = normals[i] as Point;
+        const k = Math.max(0.2, 1 + wave(i) * 0.6);
+        return { x: p.x + n.x * depth * k, y: p.y + n.y * depth * k };
+      });
+    });
+    // 起皺的紋路：水漬範圍內的短波浪線，避開保護區
+    const wrinkles: Point[][] = [];
+    const box = polygonBounds(region);
+    for (let tries = 0; tries < 200 && wrinkles.length < 8 + Math.round(s.waterStrength / 8); tries++) {
+      const start = { x: range(rng, box.x, box.x + box.w), y: range(rng, box.y, box.y + box.h) };
+      if (!pointInPolygon(start, region) || !pointInPolygon(start, outline)) continue;
+      const a = range(rng, 0, Math.PI * 2);
+      const len = range(rng, 6, 22);
+      const line: Point[] = [];
+      for (let k = 0; k <= 10; k++) {
+        const d = (len * k) / 10;
+        line.push({ x: start.x + Math.cos(a) * d - Math.sin(a) * Math.sin(k * 0.9) * 0.6, y: start.y + Math.sin(a) * d + Math.cos(a) * Math.sin(k * 0.9) * 0.6 });
+      }
+      if (polygonHitsAny(line, input.protect)) continue;
+      wrinkles.push(line);
+    }
+    // 泡得最久的幾塊：在水漬範圍內、不碰保護區、互不重疊（另用一個亂數，不影響潮線與紋路）
+    const soaked: Point[][] = [];
+    if (s.waterStrength >= 30) {
+      const srng = rngOf(`water-soak:${s.water}`);
+      const want = int(srng, 2, 4);
+      for (let tries = 0; tries < 120 && soaked.length < want; tries++) {
+        // 中心落在紙面中間七成（通常是寫字的地方），泡得最久的地方才會壓到字
+        const c = { x: range(srng, inner.x + inner.w * 0.15, inner.x + inner.w * 0.85), y: range(srng, inner.y + inner.h * 0.15, inner.y + inner.h * 0.85) };
+        const blob = blobPolygon(srng, c.x, c.y, range(srng, 8, 18), 0.35, 24);
+        if (!blob.every((p) => pointInPolygon(p, region) && pointInPolygon(p, outline))) continue;
+        if (polygonHitsAny(blob, input.protect.map((r) => inflateRect(r, 1.5)))) continue;
+        const b = polygonBounds(blob);
+        if (soaked.some((o) => rectsOverlap(polygonBounds(o), b))) continue;
+        soaked.push(blob);
+      }
+    }
+    water = {
+      polygons: [region, ...holesInWater],
+      strength: Math.max(0, Math.min(100, s.waterStrength)),
+      tides,
+      wrinkles,
+      tint: s.waterTint === 'blue' ? 'blue' : 'brown',
+      soaked,
+    };
   }
   if (s.smudge) {
     const rng = rngOf('smudge');
@@ -676,7 +841,13 @@ export function planEffects(input: PlanInput): EffectPlan {
     sun = { side: pick(rngOf('sun'), ['left', 'right', 'top', 'bottom'] as const), amount: Math.min(100, s.sunFade) };
   }
 
-  return { width: w, height: h, outline, edge, holes, water, smudges, blots, stains, rings, spots, mold, creases, folds, rust, tape, wax, pencil, sun };
+  // 火燒的焦痕：紙邊由外往內、燒洞由洞往外，都避開保護區
+  const charRng = rngOf('char');
+  const char = {
+    edge: edge === 'burnt' ? charMarks(charRng, outline, false, Math.max(0.6, Math.min(1.4, s.edgeDepth / 6)), protect) : null,
+    holes: holes.filter((x) => x.kind === 'burn').map((x) => charMarks(charRng, x.polygon, true, 0.7, protect)),
+  };
+  return { width: w, height: h, outline, edge, holes, char, water, smudges, blots, stains, rings, spots, mold, creases, folds, rust, tape, wax, pencil, sun };
 }
 
 /** 測試用：所有「會遮住字」的效果的外框。 */
@@ -697,3 +868,40 @@ export function obscuringShapes(plan: EffectPlan): Rect[] {
 }
 
 export { polygonHitsAny };
+
+export type Rgb = readonly [number, number, number];
+
+/** 浸水時字的樣子（由浸水程度決定），渲染時照這些數值畫。 */
+export interface WaterBleed {
+  /** 用紙色把原本清楚的字洗淡的程度（0～1）。 */
+  readonly wash: number;
+  /** 水漬本身的染色透明度。 */
+  readonly stain: number;
+  /**
+   * 暈開的字：把字染成 color、模糊 blur（公釐）、透明度 opacity，依序疊上。
+   * 第一層是字外圍擴散出去的暈，第二層是變淡、變色、邊緣糊掉的字身。
+   */
+  readonly layers: readonly { readonly color: Rgb; readonly blur: number; readonly opacity: number }[];
+  /** 泡得最久的幾塊：再洗淡 wash，再暈開成 blur（公釐），那裡的字幾乎無法辨識。 */
+  readonly soaked: { readonly wash: number; readonly color: Rgb; readonly blur: number; readonly opacity: number } | null;
+}
+
+/**
+ * 浸水程度對應的暈開。字約 4～6 公釐大，筆畫約 0.3～0.6 公釐粗：
+ * 程度 50 時外圍的暈約 1 公釐、字身糊開約 0.4 公釐並偏褐或偏藍，一眼看得出字邊擴散、變色；
+ * 80 以上字身糊開超過一筆的寬度、原本的字被洗掉大半，泡得最久的幾塊暈開 2 公釐以上，那些字幾乎無法辨識。
+ */
+export function waterBleed(strength: number, tint: 'blue' | 'brown'): WaterBleed {
+  const k = Math.max(0, Math.min(100, strength)) / 100;
+  const halo: Rgb = tint === 'blue' ? [62, 86, 130] : [128, 84, 42];
+  const body: Rgb = tint === 'blue' ? [40, 52, 88] : [82, 52, 28];
+  return {
+    wash: 0.16 + 0.74 * k,
+    stain: 0.05 + 0.1 * k,
+    layers: [
+      { color: halo, blur: 0.3 + 1.9 * k, opacity: 0.42 + 0.48 * k },
+      { color: body, blur: 0.1 + 0.95 * k, opacity: 0.6 + 0.35 * k },
+    ],
+    soaked: k >= 0.3 ? { wash: 0.3 * k, color: halo, blur: 0.6 + 2.6 * k, opacity: 0.45 + 0.45 * k } : null,
+  };
+}

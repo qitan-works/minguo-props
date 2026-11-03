@@ -33,7 +33,7 @@
     </header>
 
     <main class="workspace">
-      <section class="editor" aria-label="道具內容">
+      <section class="editor" id="editor" tabindex="0" role="region" aria-label="道具內容（表單）">
         <nav class="tabs" id="prop-tabs" role="tablist" aria-label="道具種類"></nav>
         <p class="status" id="status" role="status" aria-live="polite"></p>
         <div id="prop-form" role="tabpanel"></div>
@@ -46,12 +46,25 @@
         </footer>
       </section>
 
-      <section class="preview" aria-label="預覽">
+      <section class="preview" id="preview" tabindex="0" role="region" aria-label="預覽">
+        <div class="preview-bar" id="preview-bar">
+          <div class="zoom-buttons" role="group" aria-label="預覽大小">
+            <button type="button" class="btn btn-small" data-fit="page" aria-pressed="true">整張</button>
+            <button type="button" class="btn btn-small" data-fit="width" aria-pressed="false">符合寬度</button>
+            <button type="button" class="btn btn-small" data-fit="actual" aria-pressed="false">實際大小</button>
+            <button type="button" class="btn btn-small" data-zoom="-1">縮小</button>
+            <output class="zoom-value" id="zoom-value" aria-live="polite">100%</output>
+            <button type="button" class="btn btn-small" data-zoom="1">放大</button>
+          </div>
+          <p class="preview-hint">拖曳移動裝飾；Alt＋滾輪縮放、Alt＋Shift＋滾輪旋轉。</p>
+        </div>
         <p class="overflow-warning" id="overflow-warning" role="alert" hidden>內容超出版面，超出的部分不會印出。請刪減文字或改用較大的紙張。</p>
         <div class="preview-stage" id="preview-stage"></div>
         <p class="print-tip">列印時請在列印對話框選「儲存為 PDF」或你的印表機，邊界選「無」、縮放選「100%」，並勾選「背景圖形」。</p>
       </section>
     </main>
+
+    <button type="button" class="btn btn-primary jump-button" id="btn-jump" aria-controls="preview">看預覽</button>
 
     <noscript><p class="noscript">民國道具舖需要啟用 JavaScript 才能使用。</p></noscript>
 

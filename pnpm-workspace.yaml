@@ -1,0 +1,10 @@
+# pnpm 11 的專案設定（.npmrc 只放認證與 registry，其餘設定都放這裡）。
+
+# 供應鏈安全：新發布的版本至少要等 7 天（10080 分鐘）才會被解析。
+minimumReleaseAge: 10080
+# 若某個被要求的版本還沒滿 7 天，直接失敗，而不是退回舊版或照裝。
+minimumReleaseAgeStrict: true
+# 若某套件的新版本信任證據（例如 provenance）比舊版弱，拒絕安裝。
+trustPolicy: no-downgrade
+# 不允許任何依賴執行安裝腳本（本專案的依賴都不需要）。
+allowBuilds: {}

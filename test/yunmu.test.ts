@@ -41,6 +41,15 @@ describe('韻目代日對照表', () => {
     }
   });
 
+  it('20 日常用上聲「哿」，別用去聲「號」', () => {
+    assert.equal(dayToYunmu(20), '哿');
+    assert.equal(SHANG_SHENG[19], '哿');
+    assert.equal(dayToYunmu(20, true), '號');
+    assert.equal(QU_SHENG[19], '號');
+    assert.equal(yunmuToDay('哿'), 20);
+    assert.equal(yunmuToDay('號'), 20);
+  });
+
   it('30、31 日', () => {
     assert.equal(dayToYunmu(30), '卅');
     assert.equal(dayToYunmu(30, true), '陷');

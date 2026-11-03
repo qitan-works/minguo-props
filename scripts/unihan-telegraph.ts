@@ -6,7 +6,8 @@
 //   pnpm data:telegraph --zip 路徑/Unihan.zip   # 改用本機的 Unihan.zip（同樣驗證 SHA-256）
 //
 // 流程：下載固定版本的 Unihan.zip → 驗證 SHA-256 與大小 → 以 node:zlib 解壓
-// Unihan_OtherMappings.txt → 取出 kTaiwanTelegraph → 輸出精簡 JSON。
+// Unihan_OtherMappings.txt 與 Unihan_Variants.txt → 取出 kTaiwanTelegraph，
+// 並建立異體字代查表（規則見 scripts/lib/unihan.ts）→ 輸出精簡 JSON。
 //
 // 雜湊來源：Unicode 17.0.0 的 Unihan.zip。這個雜湊是由 Ubuntu 套件庫的
 // unicode-data_17.0.0.orig.tar.xz（原封收錄 unicode.org 的檔案；該 tarball 的
@@ -21,14 +22,21 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 
-import { buildTelegraphData, parseTaiwanTelegraph, serializeTelegraphData } from './lib/unihan.ts';
+import {
+  buildTelegraphData,
+  buildVariantFallback,
+  parseTaiwanTelegraph,
+  parseUnihanVariants,
+  serializeTelegraphData,
+} from './lib/unihan.ts';
 import { extractZipFile } from './lib/zip.ts';
 
 const UNICODE_VERSION = '17.0.0';
 const UNIHAN_URL = `https://www.unicode.org/Public/${UNICODE_VERSION}/ucd/Unihan.zip`;
 const UNIHAN_SHA256 = 'f7a48b2b545acfaa77b2d607ae28747404ce02baefee16396c5d2d7a8ef34b5e';
 const UNIHAN_SIZE = 8_518_517;
-const MEMBER = 'Unihan_OtherMappings.txt';
+const MAPPINGS = 'Unihan_OtherMappings.txt';
+const VARIANTS = 'Unihan_Variants.txt';
 
 const OUTPUT = fileURLToPath(new URL('../src/data/telegraph.json', import.meta.url));
 
@@ -64,9 +72,9 @@ async function main(): Promise<void> {
   const zip = values.zip ? await readFile(values.zip) : await download(UNIHAN_URL);
   verify(zip);
 
-  const text = extractZipFile(zip, MEMBER).toString('utf8');
-  const entries = parseTaiwanTelegraph(text);
-  const data = buildTelegraphData(entries, {
+  const entries = parseTaiwanTelegraph(extractZipFile(zip, MAPPINGS).toString('utf8'));
+  const variants = buildVariantFallback(entries, parseUnihanVariants(extractZipFile(zip, VARIANTS).toString('utf8')));
+  const data = buildTelegraphData(entries, variants, {
     unicodeVersion: UNICODE_VERSION,
     source: UNIHAN_URL,
     sha256: UNIHAN_SHA256,
@@ -80,12 +88,12 @@ async function main(): Promise<void> {
       process.exitCode = 1;
       return;
     }
-    console.error(`${OUTPUT} 與官方資料一致（${data.count} 字）。`);
+    console.error(`${OUTPUT} 與官方資料一致（${data.count} 字，異體字代查 ${data.variantCount} 字）。`);
     return;
   }
 
   await writeFile(OUTPUT, json, 'utf8');
-  console.error(`已寫入 ${OUTPUT}（${data.count} 字）。`);
+  console.error(`已寫入 ${OUTPUT}（${data.count} 字，異體字代查 ${data.variantCount} 字）。`);
 }
 
 main().catch((err: unknown) => {

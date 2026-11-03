@@ -2,7 +2,14 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { crc32, deflateRawSync } from 'node:zlib';
 
-import { buildTelegraphData, parseTaiwanTelegraph, parseUnihanField, serializeTelegraphData } from '../scripts/lib/unihan.ts';
+import {
+  buildTelegraphData,
+  buildVariantFallback,
+  parseTaiwanTelegraph,
+  parseUnihanField,
+  parseUnihanVariants,
+  serializeTelegraphData,
+} from '../scripts/lib/unihan.ts';
 import { extractZipFile, listZipEntries } from '../scripts/lib/zip.ts';
 
 /** 在測試裡組一個最小的 ZIP 檔（每個檔案可選擇不壓縮或 deflate）。 */
@@ -116,15 +123,56 @@ describe('Unihan 欄位解析', () => {
   });
 
   it('產生的 JSON 依電碼排序、可解析', () => {
-    const data = buildTelegraphData(parseTaiwanTelegraph(SAMPLE), {
+    const data = buildTelegraphData(parseTaiwanTelegraph(SAMPLE), { 弌: '一' }, {
       unicodeVersion: '17.0.0',
       source: 'test',
       sha256: '0'.repeat(64),
     });
     assert.deepEqual(Object.keys(data.codes), ['一', '丁', '中', '塵', '𠀀']);
     assert.equal(data.count, 5);
+    assert.equal(data.variantCount, 1);
     const text = serializeTelegraphData(data);
     assert.ok(text.endsWith('\n'));
     assert.deepEqual(JSON.parse(text), data);
+  });
+  it('代查表不得包含本身已有電碼的字，或目標沒有電碼', () => {
+    const entries = parseTaiwanTelegraph(SAMPLE);
+    const meta = { unicodeVersion: '17.0.0', source: 'test', sha256: '0'.repeat(64) };
+    assert.throws(() => buildTelegraphData(entries, { 一: '丁' }, meta), /本身已有電碼/);
+    assert.throws(() => buildTelegraphData(entries, { 弌: '乙' }, meta), /沒有電碼/);
+  });
+});
+
+describe('異體字代查表', () => {
+  const VARIANTS = [
+    'U+5373\tkSemanticVariant\tU+537D<kLau,kMatthews', // 即 → 卽
+    'U+555F\tkSemanticVariant\tU+5553<kLau,kMatthews', // 啟 → 啓
+    'U+555F\tkSpoofingVariant\tU+5553',
+    'U+5553\tkSemanticVariant\tU+555F<kLau', // 啓 本身有電碼，不需代查
+    'U+56FD\tkTraditionalVariant\tU+570B', // 国 → 國
+    'U+53D1\tkTraditionalVariant\tU+53D1 U+767C U+9AEE', // 发 → 發／髮，兩個都有電碼，不代查
+    'U+88E1\tkSpecializedSemanticVariant\tU+88CF<kMeyerWempe', // 不採用
+    'U+6237\tkZVariant\tU+6236 U+6238', // 户 → 第一個有電碼的 Z 異體字
+  ].join('\n');
+  const TELEGRAPH = [
+    'U+537D\tkTaiwanTelegraph\t0794',
+    'U+5553\tkTaiwanTelegraph\t0796',
+    'U+570B\tkTaiwanTelegraph\t0948',
+    'U+767C\tkTaiwanTelegraph\t4099',
+    'U+9AEE\tkTaiwanTelegraph\t7915',
+    'U+88CF\tkTaiwanTelegraph\t5937',
+    'U+6238\tkTaiwanTelegraph\t2073',
+  ].join('\n');
+
+  it('解析異體字欄位（含來源標註）', () => {
+    const map = parseUnihanVariants(VARIANTS);
+    assert.deepEqual(map.get(0x5373), { kSemanticVariant: [0x537d] });
+    assert.deepEqual(map.get(0x53d1), { kTraditionalVariant: [0x53d1, 0x767c, 0x9aee] });
+    assert.equal(map.has(0x88e1), false);
+  });
+
+  it('依規則挑選代查字', () => {
+    const fallback = buildVariantFallback(parseTaiwanTelegraph(TELEGRAPH), parseUnihanVariants(VARIANTS));
+    assert.deepEqual(fallback, { 即: '卽', 啟: '啓', 国: '國', 户: '戸' });
   });
 });

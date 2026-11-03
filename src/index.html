@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'"
+    />
+    <meta name="referrer" content="no-referrer" />
+    <meta name="description" content="繁體中文、直排、民國風的跑團道具產生器：報紙剪報、電報、信箋、名片與請帖。" />
+    <title>民國道具舖</title>
+    <link rel="stylesheet" href="fonts/fonts.css" />
+    <link rel="stylesheet" href="css/app.css" />
+    <link rel="stylesheet" href="css/props.css" />
+    <link rel="stylesheet" href="css/print.css" />
+    <script type="module" src="js/main.js"></script>
+  </head>
+  <body>
+    <header class="app-header">
+      <div class="brand">
+        <h1>民國道具舖</h1>
+        <p class="tagline">適合 1920～30 年代背景的克蘇魯神話調查跑團：在瀏覽器裡做報紙剪報、電報、信箋與名片，列印後發給玩家當線索。</p>
+      </div>
+      <div class="toolbar" role="toolbar" aria-label="檔案">
+        <button type="button" class="btn btn-primary" id="btn-print">列印／存成 PDF</button>
+        <button type="button" class="btn" id="btn-export">匯出 JSON</button>
+        <button type="button" class="btn" id="btn-import">匯入 JSON</button>
+        <input type="file" id="import-file" accept="application/json,.json" hidden />
+        <button type="button" class="btn" id="btn-reset">還原此道具</button>
+        <button type="button" class="btn btn-quiet" id="btn-clear">清除本機資料</button>
+      </div>
+    </header>
+
+    <main class="workspace">
+      <section class="editor" aria-label="道具內容">
+        <nav class="tabs" id="prop-tabs" role="tablist" aria-label="道具種類"></nav>
+        <p class="status" id="status" role="status" aria-live="polite"></p>
+        <div id="prop-form" role="tabpanel"></div>
+        <aside class="telegram-info" id="telegram-info" hidden></aside>
+        <footer class="editor-footer">
+          <p>
+            不收集任何資料：沒有分析、沒有追蹤，內容（含照片）只存在你的瀏覽器。
+            <a href="licenses/THIRD_PARTY_NOTICES.txt">字型與資料授權</a>
+          </p>
+        </footer>
+      </section>
+
+      <section class="preview" aria-label="預覽">
+        <p class="overflow-warning" id="overflow-warning" role="alert" hidden>內容超出版面，超出的部分不會印出。請刪減文字或改用較大的紙張。</p>
+        <div class="preview-stage" id="preview-stage"></div>
+        <p class="print-tip">列印時請在列印對話框選「儲存為 PDF」或你的印表機，邊界選「無」、縮放選「100%」，並勾選「背景圖形」。</p>
+      </section>
+    </main>
+
+    <noscript><p class="noscript">民國道具舖需要啟用 JavaScript 才能使用。</p></noscript>
+
+    <!-- 紙張做舊用的 SVG 濾鏡（全部程式產生，沒有圖片素材）。 -->
+    <svg class="svg-defs" aria-hidden="true" focusable="false" width="0" height="0">
+      <defs>
+        <!-- 水漬：不規則邊緣 -->
+        <filter id="f-stain" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB">
+          <feTurbulence type="fractalNoise" baseFrequency="0.09" numOctaves="3" seed="3" result="t" />
+          <feDisplacementMap in="SourceGraphic" in2="t" scale="9" xChannelSelector="R" yChannelSelector="G" result="d" />
+          <feGaussianBlur in="d" stdDeviation="0.8" />
+        </filter>
+        <!-- 杯底圓環 -->
+        <filter id="f-ring" x="-30%" y="-30%" width="160%" height="160%" color-interpolation-filters="sRGB">
+          <feTurbulence type="fractalNoise" baseFrequency="0.3" numOctaves="2" seed="5" result="t" />
+          <feDisplacementMap in="SourceGraphic" in2="t" scale="1.6" xChannelSelector="R" yChannelSelector="G" result="d" />
+          <feGaussianBlur in="d" stdDeviation="0.25" />
+        </filter>
+        <!-- 印泥：蓋章不均勻 -->
+        <filter id="f-ink" x="-10%" y="-10%" width="120%" height="120%" color-interpolation-filters="sRGB">
+          <feTurbulence type="fractalNoise" baseFrequency="0.7" numOctaves="2" seed="11" result="t" />
+          <feColorMatrix in="t" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -1.6 1.75" result="mask" />
+          <feComposite in="SourceGraphic" in2="mask" operator="in" result="spotty" />
+          <feDisplacementMap in="spotty" in2="t" scale="0.6" xChannelSelector="R" yChannelSelector="G" />
+        </filter>
+      </defs>
+    </svg>
+  </body>
+</html>

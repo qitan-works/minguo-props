@@ -51,6 +51,17 @@ export const newspaperFields = [
       { value: '4', label: '四段' },
     ],
   },
+  {
+    key: 'fit',
+    type: 'select',
+    label: '剪報大小',
+    group: '版面',
+    hint: '「貼合內容」會依文章長短把剪報裁成剛好的寬度。',
+    options: [
+      { value: 'content', label: '貼合內容（像剪下來的一則新聞）' },
+      { value: 'page', label: '填滿紙張' },
+    ],
+  },
   { key: 'showMasthead', type: 'checkbox', label: '顯示報頭（剪下報頭一角）', group: '版面' },
   { key: 'clipEdge', type: 'checkbox', label: '剪報毛邊', group: '版面' },
 
@@ -79,6 +90,7 @@ export type NewspaperData = DataOf<typeof newspaperFields>;
 export const newspaperDefaults: NewspaperData = {
   paper: 'a4-portrait',
   tiers: '3',
+  fit: 'content',
   showMasthead: true,
   clipEdge: true,
   masthead: '霧港日報',

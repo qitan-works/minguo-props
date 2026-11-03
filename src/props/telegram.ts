@@ -47,7 +47,17 @@ export const telegramFields = [
   { key: 'date', type: 'date', label: '發報日期', group: '電文', min: '1912-01-01', max: '1949-12-31' },
   { key: 'yunmuAlternate', type: 'checkbox', label: '代日用別用字（例如一日用「先」）', group: '電文', showIf: { key: 'dateMode', in: ['yunmu', 'yunmu-month'] } },
   { key: 'dropPunctuation', type: 'checkbox', label: '略去標點（舊式電文不拍發標點）', group: '電文' },
-  { key: 'showCodes', type: 'checkbox', label: '字旁標示電碼', group: '電文' },
+  {
+    key: 'codeDisplay',
+    type: 'select',
+    label: '方格內容',
+    group: '電文',
+    options: [
+      { value: 'both', label: '字＋旁註電碼' },
+      { value: 'chars', label: '只有字' },
+      { value: 'codes', label: '只有電碼（讓玩家查電碼本自行譯電）' },
+    ],
+  },
 
   ...agingFields('紙張效果'),
 ] as const satisfies readonly Field[];
@@ -70,7 +80,7 @@ export const telegramDefaults: TelegramData = {
   date: '1928-11-21',
   yunmuAlternate: false,
   dropPunctuation: true,
-  showCodes: true,
+  codeDisplay: 'both',
   aging: 'light',
   folds: true,
   stains: false,

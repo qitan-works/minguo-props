@@ -58,7 +58,7 @@ export type LetterData = DataOf<typeof letterFields>;
 
 export const letterDefaults: LetterData = {
   paper: 'a4-portrait',
-  columns: '10',
+  columns: '12',
   ink: 'black',
   stationer: '霧港松煙齋製',
   salutation: '守義吾弟如晤：',

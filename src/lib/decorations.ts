@@ -21,25 +21,45 @@ export type Primitive =
       readonly filter?: 'rough' | 'fine';
       readonly opacity?: number;
     }
-  | { readonly kind: 'text'; readonly x: number; readonly y: number; readonly text: string; readonly size: number; readonly fill: string; readonly vertical?: boolean; readonly weight?: number; readonly font?: 'title' | 'hand' };
+  | { readonly kind: 'text'; readonly x: number; readonly y: number; readonly text: string; readonly size: number; readonly fill: string; readonly vertical?: boolean; readonly weight?: number; readonly font?: 'title' | 'hand' }
+  /** 一組圖形，可整組模糊（手印各塊壓痕之間的過渡）。 */
+  | { readonly kind: 'group'; readonly children: readonly Primitive[]; readonly blur?: number };
 
-/** 徑向漸層（座標單位公釐，以裝飾中心為原點）。 */
-export interface GradientDef {
-  readonly id: string;
-  readonly cx: number;
-  readonly cy: number;
-  readonly r: number;
-  readonly stops: readonly (readonly [number, string])[];
+type GradientStops = readonly (readonly [number, string])[];
+
+/** 漸層（座標單位公釐，以裝飾中心為原點）。 */
+export type GradientDef =
+  | { readonly kind: 'radial'; readonly id: string; readonly cx: number; readonly cy: number; readonly r: number; readonly stops: GradientStops }
+  | { readonly kind: 'linear'; readonly id: string; readonly x1: number; readonly y1: number; readonly x2: number; readonly y2: number; readonly stops: GradientStops };
+
+/**
+ * 血跡等污漬的質感，交給 SVG 濾鏡處理：
+ * - 邊緣用雜訊擾動成不規則，再略為模糊，所以沒有硬邊框；
+ * - 內部的透明度由另一層雜訊控制（feTurbulence），做出斑駁、深淺不均。
+ * 雜訊種子由裝飾的種子決定，所以預覽與列印一致、按「換一個」才會變。
+ */
+export interface StainTexture {
+  readonly seed: number;
+  /** 邊緣擾動：雜訊頻率（每公釐）與最大位移（公釐）。 */
+  readonly warpFrequency: number;
+  readonly warp: number;
+  /** 邊緣柔化：模糊的標準差（公釐）。 */
+  readonly soften: number;
+  /** 斑駁：雜訊頻率，以及透明度 = 斜率 × 雜訊 + 截距（再限制在 0～1）。 */
+  readonly mottleFrequency: number;
+  readonly mottle: readonly [slope: number, intercept: number];
 }
 
 export interface DecorationShape {
   readonly primitives: Primitive[];
   readonly gradients?: readonly GradientDef[];
   /**
-   * 遮罩：白色的地方留下、黑色的地方挖空（手印的掌紋、按壓不均的缺塊）。
+   * 遮罩：亮的地方留下、暗的地方挖空，灰階代表按壓的輕重（血手印整個印子就是畫在遮罩裡）。
    * 用遮罩而不是畫紙色，是因為紙色會隨做舊程度改變。
    */
   readonly mask?: readonly Primitive[];
+  /** 污漬質感（不規則略柔和的邊緣、斑駁的透明度）。 */
+  readonly texture?: StainTexture;
   /** 大約的外接半徑（公釐），用於點選與測試。 */
   readonly radius: number;
   /** 使用印泥質感濾鏡（戳記、火漆）。 */
@@ -79,31 +99,42 @@ export interface BloodPalette {
   readonly core: string;
   readonly mid: string;
   readonly edge: string;
-  readonly ring: string;
   readonly mist: string;
 }
 
-/** 新鮮的血偏鮮紅；乾涸後氧化成暗紅到褐色。 */
+/**
+ * 新鮮的血偏鮮紅；乾涸後氧化成暗紅到褐色。
+ * 顏色都不透明：重疊的地方不會疊出深色接縫，透明度與斑駁交給 StainTexture 的濾鏡。
+ * 邊緣色只比中間略深一點（乾掉時邊緣會積得較濃），不是一圈框線。
+ */
 export function bloodPalette(dry: boolean): BloodPalette {
   return dry
-    ? { core: 'rgb(128 58 34 / 0.5)', mid: 'rgb(100 38 20 / 0.78)', edge: 'rgb(74 24 11 / 0.93)', ring: 'rgb(56 16 7 / 0.9)', mist: 'rgb(92 34 17 / 0.72)' }
-    : { core: 'rgb(158 18 18 / 0.55)', mid: 'rgb(134 9 11 / 0.82)', edge: 'rgb(104 4 7 / 0.95)', ring: 'rgb(82 2 5 / 0.92)', mist: 'rgb(136 10 12 / 0.78)' };
+    ? { core: 'rgb(130 58 36 / 1)', mid: 'rgb(106 40 22 / 1)', edge: 'rgb(90 31 16 / 1)', mist: 'rgb(102 38 20 / 1)' }
+    : { core: 'rgb(160 22 20 / 1)', mid: 'rgb(134 10 12 / 1)', edge: 'rgb(116 6 9 / 1)', mist: 'rgb(140 12 14 / 1)' };
 }
 
 function withAlpha(color: string, alpha: number): string {
   return color.replace(/\/ [0-9.]+\)/, `/ ${alpha.toFixed(2)})`);
 }
 
-/** 一灘：中心淡、邊緣深的漸層，加上乾涸後的深色環；邊緣用擾動濾鏡變得不規則。 */
-function pool(rng: Rng, id: string, cx: number, cy: number, r: number, irregular: number, pal: BloodPalette, squash = 1): { prims: Primitive[]; grad: GradientDef } {
-  const pts = blobPolygon(rng, cx, cy, r, irregular, 30).map((p) => ({ x: p.x, y: cy + (p.y - cy) * squash }));
-  const d = poly(pts);
+/**
+ * 污漬質感的參數。乾涸的比新鮮的斑駁（透明度起伏大、會出現幾乎沒沾到的地方）；
+ * 手印的擾動較細、幾乎不模糊，指紋才看得到，斑駁更強，像按壓時沒沾到的地方。
+ */
+export function stainTexture(rng: Rng, kind: 'stain' | 'print', dry: boolean): StainTexture {
+  const seed = int(rng, 1, 997);
+  if (kind === 'print') {
+    return { seed, warpFrequency: 1.1, warp: 0.28, soften: 0.05, mottleFrequency: 0.42, mottle: dry ? [3.1, -0.75] : [2.6, -0.4] };
+  }
+  return { seed, warpFrequency: 0.6, warp: 0.45, soften: 0.17, mottleFrequency: 0.3, mottle: dry ? [2.9, -0.6] : [2.2, -0.15] };
+}
+
+/** 一灘：中心略淺、邊緣略深的漸層，沒有外框；邊緣的不規則與柔和交給濾鏡。 */
+function pool(rng: Rng, id: string, cx: number, cy: number, r: number, irregular: number, pal: BloodPalette, squash = 1): { prim: Primitive; grad: GradientDef } {
+  const pts = blobPolygon(rng, cx, cy, r, irregular, 36).map((p) => ({ x: p.x, y: cy + (p.y - cy) * squash }));
   return {
-    grad: { id, cx, cy, r: r * 1.1, stops: [[0, pal.core], [0.62, pal.mid], [1, pal.edge]] },
-    prims: [
-      { kind: 'path', d, fill: `grad:${id}`, filter: 'rough' },
-      { kind: 'path', d, fill: 'none', stroke: pal.ring, width: Math.max(0.25, r * 0.07), filter: 'rough' },
-    ],
+    grad: { kind: 'radial', id, cx, cy, r: r * 1.15, stops: [[0, pal.core], [0.7, pal.mid], [1, pal.edge]] },
+    prim: { kind: 'path', d: poly(pts), fill: `grad:${id}` },
   };
 }
 
@@ -118,12 +149,19 @@ export function teardrop(hx: number, hy: number, r: number, a: number, len: numb
   return pts;
 }
 
-/** 噴濺：中央一灘，四周大小不一的衛星血點與有方向性的拉長血滴，外加細霧。 */
+/** 噴濺：中央一灘與向外的尖刺，四周大小不一的衛星血點與有方向性的拉長血滴，外加細霧。 */
 function splatter(rng: Rng, pal: BloodPalette): { prims: Primitive[]; grads: GradientDef[] } {
   const r = range(rng, 4.5, 7);
   const main = pool(rng, 'pool', 0, 0, r, 0.5, pal);
-  const prims: Primitive[] = [...main.prims];
+  const prims: Primitive[] = [];
   const dir = range(rng, 0, Math.PI * 2);
+  // 血滴落下時從本體濺出的尖刺（從邊緣往外變細）
+  for (let i = 0, n = int(rng, 6, 12); i < n; i++) {
+    const a = range(rng, 0, Math.PI * 2);
+    const w = range(rng, 0.35, 0.9);
+    prims.push({ kind: 'path', d: poly(teardrop(Math.cos(a) * (r * 0.82), Math.sin(a) * (r * 0.82), w, a, range(rng, 1, 4.5))), fill: pal.mid });
+  }
+  prims.push(main.prim);
   for (let i = 0, n = int(rng, 30, 48); i < n; i++) {
     const a = rng() < 0.25 ? range(rng, 0, Math.PI * 2) : dir + gaussianish(rng) * 0.55;
     const dist = r + 1 + 15 * Math.pow(rng(), 0.75);
@@ -131,7 +169,7 @@ function splatter(rng: Rng, pal: BloodPalette): { prims: Primitive[]; grads: Gra
     const cx = Math.cos(a) * dist;
     const cy = Math.sin(a) * dist;
     if (size > 0.3 && rng() < 0.6) {
-      prims.push({ kind: 'path', d: poly(teardrop(cx, cy, size, a, size * range(rng, 1.1, 2.8))), fill: pal.mid, filter: 'fine' });
+      prims.push({ kind: 'path', d: poly(teardrop(cx, cy, size, a, size * range(rng, 1.1, 2.8))), fill: pal.mid });
     } else {
       prims.push({ kind: 'path', d: circle(cx, cy, size), fill: size > 0.6 ? pal.mid : pal.mist });
     }
@@ -152,36 +190,44 @@ function drips(rng: Rng, pal: BloodPalette): { prims: Primitive[]; grads: Gradie
     const x = range(rng, -7.5, 7.5);
     const w = range(rng, 0.7, 2);
     const len = range(rng, 6, 22);
-    const y0 = -11.5;
+    const y0 = -12.5;
     const left: Point[] = [];
     const right: Point[] = [];
-    for (let k = 0; k <= 10; k++) {
-      const t = k / 10;
+    for (let k = 0; k <= 12; k++) {
+      const t = k / 12;
       const cx = x + Math.sin(t * 3 + i) * 0.35;
-      const half = (w / 2) * (1 - 0.45 * t);
+      const half = (w / 2) * (1 - 0.45 * t) * (1 + 0.12 * Math.sin(t * 9 + i * 2));
       left.push({ x: cx - half, y: y0 + t * len });
       right.push({ x: cx + half, y: y0 + t * len });
     }
-    prims.push({ kind: 'path', d: poly([...left, ...right.reverse()]), fill: pal.mid, filter: 'fine' });
+    prims.push({ kind: 'path', d: poly([...left, ...right.reverse()]), fill: pal.mid });
     const endX = x + Math.sin(3 + i) * 0.35;
-    prims.push({ kind: 'path', d: poly(teardrop(endX, y0 + len + w * 0.5, w * 0.75, -Math.PI / 2, w * 1.1)), fill: pal.edge, filter: 'fine' });
+    prims.push({ kind: 'path', d: poly(teardrop(endX, y0 + len + w * 0.5, w * 0.75, -Math.PI / 2, w * 1.1)), fill: pal.edge });
     if (rng() < 0.4) prims.push({ kind: 'path', d: poly(teardrop(endX, y0 + len + w * 3 + range(rng, 1, 4), w * 0.5, -Math.PI / 2, w * 0.9)), fill: pal.mid });
   }
-  return { prims: [...top.prims, ...prims], grads: [top.grad] };
+  return { prims: [...prims, top.prim], grads: [top.grad] };
 }
 
-/** 拖痕：起點一灘，接著是刷痕般的平行細紋，越往後越淡、越窄、斷斷續續。 */
+/** 拖痕：起點一灘，接著是一道往後漸淡、漸窄的抹痕，上面有刷痕般斷斷續續的平行細紋。 */
 function smear(rng: Rng, pal: BloodPalette): { prims: Primitive[]; grads: GradientDef[] } {
   const start = pool(rng, 'pool', -18, 0, 4.2, 0.35, pal, 0.9);
   const prims: Primitive[] = [];
   const bend = range(rng, -3, 3);
   const at = (t: number, off: number): Point => ({ x: -18 + t * 40, y: Math.sin(t * Math.PI) * bend + off * (1 - t * 0.35) });
   const W = range(rng, 6, 8);
-  for (let s = 0; s < 6; s++) {
-    const t0 = s / 6;
-    const t1 = (s + 1) / 6 + 0.02;
-    prims.push({ kind: 'path', d: poly([at(t0, -W / 2), at(t1, -W / 2), at(t1, W / 2), at(t0, W / 2)]), fill: withAlpha(pal.mid, 0.5 * (1 - s / 6.5)), filter: 'fine' });
+  // 抹痕本體：一整塊，邊緣起伏，用沿拖曳方向的漸層由濃到淡（不分段，所以沒有接縫）
+  const upper: Point[] = [];
+  const lower: Point[] = [];
+  for (let k = 0; k <= 28; k++) {
+    const t = k / 28;
+    upper.push(at(t, -W / 2 + gaussianish(rng) * 0.25 + Math.sin(t * 11) * 0.3));
+    lower.push(at(t, W / 2 + gaussianish(rng) * 0.25 + Math.sin(t * 7 + 1) * 0.3));
   }
+  const grads: GradientDef[] = [
+    start.grad,
+    { kind: 'linear', id: 'smear', x1: -18, y1: 0, x2: 22, y2: 0, stops: [[0, withAlpha(pal.mid, 0.85)], [0.45, withAlpha(pal.mid, 0.45)], [1, withAlpha(pal.mid, 0.04)]] },
+  ];
+  prims.push({ kind: 'path', d: poly([...upper, ...lower.reverse()]), fill: 'grad:smear' });
   for (let i = 0, n = int(rng, 18, 28); i < n; i++) {
     const off = range(rng, -W / 2, W / 2);
     const t0 = range(rng, 0, 0.1);
@@ -189,9 +235,10 @@ function smear(rng: Rng, pal: BloodPalette): { prims: Primitive[]; grads: Gradie
     const pts: Point[] = [];
     for (let k = 0; k <= 12; k++) pts.push(at(t0 + ((t1 - t0) * k) / 12, off));
     const dash = rng() < 0.7 ? `${range(rng, 4, 12).toFixed(1)} ${range(rng, 0.4, 2.2).toFixed(1)} ${range(rng, 2, 6).toFixed(1)} ${range(rng, 0.8, 3).toFixed(1)}` : undefined;
-    prims.push({ kind: 'path', d: wobbly(rng, pts, 0.05), fill: 'none', stroke: pal.edge, width: range(rng, 0.12, 0.55), cap: 'round', opacity: Number(range(rng, 0.35, 0.9).toFixed(2)), ...(dash ? { dash } : {}) });
+    prims.push({ kind: 'path', d: wobbly(rng, pts, 0.05), fill: 'none', stroke: pal.edge, width: range(rng, 0.12, 0.55), cap: 'round', opacity: Number(range(rng, 0.3, 0.8).toFixed(2)), ...(dash ? { dash } : {}) });
   }
-  return { prims: [...start.prims, ...prims], grads: [start.grad] };
+  prims.push(start.prim);
+  return { prims, grads };
 }
 
 /** 手指：指根寬 w0、指尖圓頭寬 w1，從 (x0, y0) 朝 a 方向長 len。 */
@@ -212,62 +259,162 @@ export function fingerShape(x0: number, y0: number, a: number, len: number, w0: 
   return pts;
 }
 
-/** 血手印：掌心與五指，按壓不均（掌心淡、指尖濃）、掌紋與指節留白、部分缺塊。 */
-function handprint(rng: Rng, pal: BloodPalette): { prims: Primitive[]; grads: GradientDef[]; mask: Primitive[] } {
-  const prims: Primitive[] = [];
-  const mask: Primitive[] = [{ kind: 'path', d: 'M-40 -40H40V40H-40Z', fill: 'white' }];
-  // 掌：略呈梯形的圓角形，掌心（中央偏下）按得輕
-  const palm: Point[] = [];
-  for (let i = 0; i < 32; i++) {
-    const t = (i / 32) * Math.PI * 2;
-    const c = Math.cos(t);
-    const s = Math.sin(t);
-    const wide = s < 0 ? 8.2 : 7.2 + s * 0.4;
-    palm.push({ x: Math.sign(c) * Math.pow(Math.abs(c), 0.7) * wide + range(rng, -0.25, 0.25), y: 6 + Math.sign(s) * Math.pow(Math.abs(s), 0.8) * 7.8 + range(rng, -0.25, 0.25) });
+/** 手印的一塊壓痕：沿 a 方向半長 hl、橫向半寬 hw 的橢圓，邊緣略有起伏。 */
+interface Pad {
+  readonly cx: number;
+  readonly cy: number;
+  readonly hl: number;
+  readonly hw: number;
+  readonly a: number;
+  /** 按壓的輕重（遮罩的亮度，0～1）。 */
+  readonly level: number;
+  readonly pts: readonly Point[];
+}
+
+function makePad(rng: Rng, cx: number, cy: number, hl: number, hw: number, a: number, level: number): Pad {
+  const ux = Math.cos(a);
+  const uy = Math.sin(a);
+  const pts: Point[] = [];
+  const phase = range(rng, 0, Math.PI * 2);
+  for (let i = 0; i < 28; i++) {
+    const t = (i / 28) * Math.PI * 2;
+    const k = 1 + 0.07 * Math.sin(t * 3 + phase) + gaussianish(rng) * 0.035;
+    const along = Math.cos(t) * hl * k;
+    const across = Math.sin(t) * hw * k;
+    pts.push({ x: cx + ux * along - uy * across, y: cy + uy * along + ux * across });
   }
-  const grads: GradientDef[] = [{ id: 'palm', cx: 0.6, cy: 7, r: 9.5, stops: [[0, withAlpha(pal.core, 0.32)], [0.55, pal.mid], [1, pal.edge]] }];
-  prims.push({ kind: 'path', d: poly(palm), fill: 'grad:palm', filter: 'fine' });
-  // 四指與拇指（中指最長）
+  return { cx, cy, hl, hw, a, level, pts };
+}
+
+function gray(level: number): string {
+  const v = Math.round(Math.max(0, Math.min(1, level)) * 255);
+  return `rgb(${v} ${v} ${v})`;
+}
+
+/**
+ * 血手印：像真的手按上去的印子，而不是一個手形剪影。整個印子畫在遮罩裡（灰階＝按壓輕重），
+ * 上面只有一塊血色，所以沒有外框：
+ * - 掌心凹處幾乎沒沾到，掌根、拇指根、指根的肉墊與指尖按得重，指節之間是自然的斷開；
+ * - 指尖有指紋的紋路；
+ * - 隨機缺幾塊，加上斑駁濾鏡讓沒沾到的地方自然出現；
+ * - 整隻手往一個方向略微拖抹：印子後方有漸淡的殘影與拖痕。
+ */
+function handprint(rng: Rng, pal: BloodPalette, dry: boolean): { prims: Primitive[]; grads: GradientDef[]; mask: Primitive[] } {
+  const mirror = rng() < 0.5 ? -1 : 1;
+  const turn = range(rng, -0.15, 0.15);
+  const place = (p: Point): Point => {
+    const x = p.x * mirror;
+    return { x: x * Math.cos(turn) - p.y * Math.sin(turn), y: x * Math.sin(turn) + p.y * Math.cos(turn) };
+  };
+  const angle = (a: number): number => (mirror < 0 ? Math.PI - a : a) + turn;
+  const pad = (cx: number, cy: number, hl: number, hw: number, a: number, level: number): Pad => {
+    const c = place({ x: cx, y: cy });
+    return makePad(rng, c.x, c.y, hl, hw, angle(a), level);
+  };
+
+  // 掌：先畫輕的（掌心），重的蓋在上面；遮罩裡後畫的直接取代，不會疊深
+  const hollow: Pad[] = [];
+  for (let i = 0, n = int(rng, 3, 5); i < n; i++) {
+    hollow.push(pad(range(rng, -2.2, 2.8), range(rng, 3.4, 7.4), range(rng, 0.6, 1.5), range(rng, 0.5, 1.2), range(rng, 0, Math.PI), range(rng, 0.2, 0.42)));
+  }
+  const palm: Pad[] = [
+    pad(0, 12.6, 5.8, 2.3, 0, range(rng, 0.5, 0.68)),
+    pad(4.7, 8.4, 5.2, 2.9, Math.PI / 2 + 0.1, range(rng, 0.6, 0.78)),
+    pad(-4.4, 8.8, 4.7, 3.4, Math.PI / 2 - 0.35, range(rng, 0.72, 0.88)),
+  ];
   const fingers = [
-    { x: -6, y: -0.6, a: -1.78, len: 11.5, w0: 3.5, w1: 3.0 },
-    { x: -2.1, y: -1.6, a: -1.63, len: 13.6, w0: 3.8, w1: 3.25 },
-    { x: 1.9, y: -1.4, a: -1.5, len: 12.8, w0: 3.65, w1: 3.1 },
-    { x: 5.6, y: -0.2, a: -1.33, len: 10, w0: 3.2, w1: 2.75 },
-    { x: -7.6, y: 8.5, a: -2.55, len: 10.5, w0: 4.4, w1: 3.6 },
+    { x: -6, y: -0.6, a: -1.78, len: 11.5, w: 3.3 },
+    { x: -2.1, y: -1.6, a: -1.63, len: 13.6, w: 3.5 },
+    { x: 1.9, y: -1.4, a: -1.5, len: 12.8, w: 3.4 },
+    { x: 5.6, y: -0.2, a: -1.33, len: 10, w: 3.0 },
   ];
-  fingers.forEach((f, i) => {
-    const len = f.len * range(rng, 0.94, 1.04) * (i < 4 && rng() < 0.1 ? 0.55 : 1);
-    const a = f.a + range(rng, -0.06, 0.06);
-    // 指根往掌內多伸一點，和手掌連在一起
-    const bx = f.x - Math.cos(a) * 1.6;
-    const by = f.y - Math.sin(a) * 1.6;
-    prims.push({ kind: 'path', d: poly(fingerShape(bx, by, a, len + 1.6, f.w0 * 1.05, f.w1)), fill: pal.mid, filter: 'fine' });
-    // 指尖按得重
-    const tx = f.x + Math.cos(a) * (len - f.w1 * 0.75);
-    const ty = f.y + Math.sin(a) * (len - f.w1 * 0.75);
-    prims.push({ kind: 'path', d: ellipse(tx, ty, f.w1 * 0.42, f.w1 * 0.5), fill: withAlpha(pal.edge, 0.55), filter: 'fine' });
-    // 指節的摺痕留白
-    for (const k of i === 4 ? [0.45] : [0.38, 0.66]) {
-      const cx = f.x + Math.cos(a) * len * k;
-      const cy = f.y + Math.sin(a) * len * k;
-      const px = -Math.sin(a) * f.w0 * 0.55;
-      const py = Math.cos(a) * f.w0 * 0.55;
-      mask.push({ kind: 'path', d: wobbly(rng, [{ x: cx - px, y: cy - py }, { x: cx - px * 0.3, y: cy - py * 0.3 + range(rng, -0.2, 0.2) }, { x: cx + px, y: cy + py }], 0.08), fill: 'none', stroke: 'black', width: range(rng, 0.14, 0.26), cap: 'round', dash: `${range(rng, 0.8, 2).toFixed(2)} ${range(rng, 0.2, 0.6).toFixed(2)}` });
-    }
-  });
-  // 掌紋：感情線、智慧線、生命線
-  const lines: Point[][] = [
-    [{ x: 7.6, y: 2.4 }, { x: 3, y: 3.6 }, { x: -2, y: 3 }, { x: -5.5, y: 1.6 }],
-    [{ x: -7.4, y: 4.2 }, { x: -3, y: 5.6 }, { x: 2, y: 6.8 }, { x: 6.5, y: 9 }],
-    [{ x: -6.8, y: 4.4 }, { x: -4.4, y: 8.5 }, { x: -3.2, y: 12 }, { x: -2.6, y: 13.6 }],
-  ];
-  for (const l of lines) mask.push({ kind: 'path', d: wobbly(rng, l, 0.22), fill: 'none', stroke: 'black', width: range(rng, 0.18, 0.34), cap: 'round', dash: `${range(rng, 2, 5).toFixed(2)} ${range(rng, 0.3, 1).toFixed(2)}` });
-  // 按壓不均：幾塊缺失與許多細小白點
-  for (let i = 0, n = int(rng, 2, 5); i < n; i++) {
-    mask.push({ kind: 'path', d: poly(blobPolygon(rng, range(rng, -7, 7), range(rng, -8, 13), range(rng, 0.8, 2.6), 0.45, 14)), fill: 'black' });
+  // 指根下方的肉墊
+  for (const f of fingers) palm.push(pad(f.x, f.y + 1.7, 1.55, 2.1, 0, range(rng, 0.72, 0.9)));
+  const digits: Pad[] = [];
+  const tips: Pad[] = [];
+  const segment = (x: number, y: number, a: number, len: number, w: number, parts: readonly (readonly [number, number, number])[]): void => {
+    let s = 0;
+    parts.forEach(([frac, lo, hi], i) => {
+      const gap = i === 0 ? 0 : range(rng, 0.2, 0.42);
+      const l = len * frac;
+      const mid = s + gap + (l - gap) / 2;
+      const taper = 1 - 0.08 * i;
+      const p = pad(x + Math.cos(a) * mid, y + Math.sin(a) * mid, (l - gap) / 2 + 0.05, (w / 2) * taper, a, range(rng, lo, hi));
+      digits.push(p);
+      if (i === parts.length - 1) tips.push(p);
+      s += l;
+    });
+  };
+  for (const f of fingers) {
+    const short = rng() < 0.12 ? 0.6 : 1;
+    const proximal: [number, number, number] = rng() < 0.15 ? [0.42, 0.12, 0.3] : [0.42, 0.6, 0.8];
+    segment(f.x, f.y, f.a + range(rng, -0.06, 0.06), f.len * range(rng, 0.95, 1.04) * short, f.w, [proximal, [0.28, 0.74, 0.9], [0.3, 0.9, 1]]);
   }
-  for (let i = 0; i < 60; i++) mask.push({ kind: 'path', d: circle(range(rng, -10, 10), range(rng, -14, 14), range(rng, 0.08, 0.3)), fill: 'black' });
-  return { prims, grads, mask };
+  segment(-6.8, 7.4, -2.5 + range(rng, -0.08, 0.08), 10.5, 3.9, [[0.5, 0.58, 0.76], [0.5, 0.88, 1]]);
+  // 由輕到重排序：遮罩裡後畫的取代先畫的，重疊處就取按得較重的那塊
+  const all = [...hollow, ...palm, ...digits].sort((p, q) => p.level - q.level);
+
+  const mask: Primitive[] = [];
+  // 往一個方向拖抹：印子後方幾層漸淡的殘影，加上指尖與掌根拉出的拖痕
+  const drag = Math.PI / 2 + range(rng, -0.9, 0.9);
+  const dragLen = range(rng, 2.5, 6);
+  const dx = Math.cos(drag);
+  const dy = Math.sin(drag);
+  const ghosts: Primitive[] = [];
+  for (let k = 5; k >= 1; k--) {
+    const off = (k / 5) * dragLen;
+    const fade = 0.24 * (1 - (k - 1) / 5.5);
+    for (const p of all) ghosts.push({ kind: 'path', d: poly(p.pts.map((q) => ({ x: q.x + dx * off, y: q.y + dy * off }))), fill: gray(p.level * fade) });
+  }
+  const streaks: Primitive[] = [];
+  for (const p of [...tips, ...palm.slice(0, 3)]) {
+    for (let i = 0, n = int(rng, 2, 4); i < n; i++) {
+      const across = range(rng, -0.8, 0.8) * p.hw;
+      const sx = p.cx - Math.sin(p.a) * across;
+      const sy = p.cy + Math.cos(p.a) * across;
+      const len = dragLen * range(rng, 0.7, 1.5);
+      const pts: Point[] = [];
+      for (let k = 0; k <= 6; k++) pts.push({ x: sx + dx * len * (k / 6), y: sy + dy * len * (k / 6) });
+      streaks.push({ kind: 'path', d: wobbly(rng, pts, 0.06), fill: 'none', stroke: gray(range(rng, 0.25, 0.5)), width: range(rng, 0.12, 0.4), cap: 'round' });
+    }
+  }
+  // 隨機缺塊（和壓痕一起模糊，邊緣才不會像打洞）
+  const chunks: Primitive[] = [];
+  for (let i = 0, n = dry ? int(rng, 2, 5) : int(rng, 1, 3); i < n; i++) {
+    const p = all[int(rng, 0, all.length - 1)]!;
+    chunks.push({ kind: 'path', d: poly(blobPolygon(rng, p.cx + range(rng, -1, 1) * p.hw, p.cy + range(rng, -1, 1) * p.hw, range(rng, 0.6, 2.2), 0.5, 14)), fill: 'black', opacity: Number(range(rng, 0.7, 1).toFixed(2)) });
+  }
+  // 各塊壓痕整組略為模糊，輕重之間的過渡才自然
+  mask.push({ kind: 'group', blur: 0.14, children: [...ghosts, ...streaks, ...all.map((p): Primitive => ({ kind: 'path', d: poly(p.pts), fill: gray(p.level) })), ...chunks] });
+
+  // 指紋：整個指尖一圈圈的紋路（螺旋紋或箕形紋），斷斷續續、和壓痕一樣略模糊
+  const ridges: Primitive[] = [];
+  for (const t of tips) {
+    const whorl = rng() < 0.5;
+    const spacing = range(rng, 0.3, 0.36);
+    const n = Math.floor((t.hw * 1.02) / spacing);
+    const ratio = t.hl / t.hw;
+    const core = { x: t.cx + Math.cos(t.a) * t.hl * 0.12, y: t.cy + Math.sin(t.a) * t.hl * 0.12 };
+    const from = whorl ? 0 : range(rng, 0.2, 0.6);
+    const to = whorl ? Math.PI * 2 : Math.PI * 2 - range(rng, 0.2, 0.6);
+    for (let i = 1; i <= n; i++) {
+      const ra = spacing * i * ratio;
+      const rb = spacing * i;
+      const pts: Point[] = [];
+      for (let k = 0; k <= 30; k++) {
+        const u = from + ((to - from) * k) / 30;
+        const along = Math.cos(u) * ra;
+        const acrossV = Math.sin(u) * rb;
+        pts.push({ x: core.x + Math.cos(t.a) * along - Math.sin(t.a) * acrossV, y: core.y + Math.sin(t.a) * along + Math.cos(t.a) * acrossV });
+      }
+      const dash = `${range(rng, 1.2, 3.2).toFixed(2)} ${range(rng, 0.12, 0.4).toFixed(2)}`;
+      ridges.push({ kind: 'path', d: wobbly(rng, pts, 0.03), fill: 'none', stroke: 'black', width: range(rng, 0.11, 0.15), cap: 'round', opacity: Number(range(rng, 0.36, 0.52).toFixed(2)), dash });
+    }
+  }
+  mask.push({ kind: 'group', blur: 0.04, children: ridges });
+
+  const grads: GradientDef[] = [{ kind: 'radial', id: 'hand', cx: 0, cy: 3, r: 20, stops: [[0, pal.core], [0.6, pal.mid], [1, pal.edge]] }];
+  return { prims: [{ kind: 'path', d: 'M-34 -34H34V34H-34Z', fill: 'grad:hand' }], grads, mask };
 }
 
 /** 抓痕：三到四道平行的深色劃痕，頭尾尖細；中間露出被刮起的淺色紙纖維，邊緣有毛邊。 */
@@ -309,7 +456,7 @@ function claw(rng: Rng): Primitive[] {
 
 /** 黏液：半透明、帶光澤，往下垂流。 */
 function slime(rng: Rng): { prims: Primitive[]; grads: GradientDef[] } {
-  const grads: GradientDef[] = [{ id: 'slime', cx: -2, cy: -2, r: 13, stops: [[0, 'rgb(170 200 110 / 0.28)'], [0.7, 'rgb(105 140 60 / 0.48)'], [1, 'rgb(60 95 38 / 0.65)']] }];
+  const grads: GradientDef[] = [{ kind: 'radial', id: 'slime', cx: -2, cy: -2, r: 13, stops: [[0, 'rgb(170 200 110 / 0.28)'], [0.7, 'rgb(105 140 60 / 0.48)'], [1, 'rgb(60 95 38 / 0.65)']] }];
   const body = poly(blobPolygon(rng, 0, 0, 11, 0.5, 30));
   const prims: Primitive[] = [
     { kind: 'path', d: body, fill: 'grad:slime', filter: 'rough' },
@@ -486,20 +633,24 @@ export function decorationShape(type: DecorationType, seed: number, text: string
   const pal = bloodPalette(dry);
   switch (type) {
     case 'blood-splatter': {
+      const texture = stainTexture(rng, 'stain', dry);
       const s = splatter(rng, pal);
-      return { primitives: s.prims, gradients: s.grads, radius: 22 };
+      return { primitives: s.prims, gradients: s.grads, texture, radius: 22 };
     }
     case 'blood-drip': {
+      const texture = stainTexture(rng, 'stain', dry);
       const s = drips(rng, pal);
-      return { primitives: s.prims, gradients: s.grads, radius: 24 };
+      return { primitives: s.prims, gradients: s.grads, texture, radius: 24 };
     }
     case 'blood-smear': {
+      const texture = stainTexture(rng, 'stain', dry);
       const s = smear(rng, pal);
-      return { primitives: s.prims, gradients: s.grads, radius: 24 };
+      return { primitives: s.prims, gradients: s.grads, texture, radius: 24 };
     }
     case 'handprint': {
-      const s = handprint(rng, pal);
-      return { primitives: s.prims, gradients: s.grads, mask: s.mask, radius: 22 };
+      const texture = stainTexture(rng, 'print', dry);
+      const s = handprint(rng, pal, dry);
+      return { primitives: s.prims, gradients: s.grads, mask: s.mask, texture, radius: 22 };
     }
     case 'coffee-ring': {
       const r = range(rng, 11, 14);
@@ -514,9 +665,10 @@ export function decorationShape(type: DecorationType, seed: number, text: string
       };
     }
     case 'ink-blot': {
-      const ink: BloodPalette = { core: 'rgb(30 28 34 / 0.6)', mid: 'rgb(22 20 26 / 0.85)', edge: 'rgb(14 12 18 / 0.95)', ring: 'rgb(10 8 12 / 0.9)', mist: 'rgb(22 20 26 / 0.75)' };
+      const ink: BloodPalette = { core: 'rgb(34 32 38 / 1)', mid: 'rgb(24 22 28 / 1)', edge: 'rgb(16 14 20 / 1)', mist: 'rgb(24 22 28 / 1)' };
+      const texture = stainTexture(rng, 'stain', false);
       const s = splatter(rng, ink);
-      return { primitives: s.prims.slice(0, 18), gradients: s.grads, radius: 20 };
+      return { primitives: s.prims.slice(0, 26), gradients: s.grads, texture, radius: 20 };
     }
     case 'fingerprint':
       return { primitives: fingerprint(rng), radius: 10 };

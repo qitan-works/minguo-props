@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { bloodPalette, decorationShape, placeDecoration, type Primitive } from '../src/lib/decorations.ts';
+import { bloodPalette, decorationShape, placeDecoration, type Primitive, type StainTexture } from '../src/lib/decorations.ts';
 import { rectsOverlap } from '../src/lib/geometry.ts';
 import { charJitter, madGlyph, madText } from '../src/lib/madness.ts';
 import { stripMarkup } from '../src/lib/markup.ts';
@@ -10,6 +10,7 @@ import { DECORATION_TYPES } from '../src/props/extras.ts';
 /** 從 path 的座標數字粗估範圍（只取 M、L、Q、H、V 後面的絕對座標）。 */
 function pathExtent(p: Primitive): number {
   if (p.kind === 'text') return Math.hypot(p.x, p.y) + p.size;
+  if (p.kind === 'group') return p.children.reduce((m, c) => Math.max(m, pathExtent(c)), 0);
   const nums = (p.d.match(/-?\d+(?:\.\d+)?/g) ?? []).map(Number);
   return nums.reduce((m, n) => Math.max(m, Math.abs(n)), 0);
 }
@@ -131,48 +132,123 @@ describe('越寫越亂', () => {
 
 describe('裝飾的質感（第三版）', () => {
   const rgb = (c: string): number[] => (/rgb\((\d+) (\d+) (\d+)/.exec(c) ?? []).slice(1).map(Number);
+  const alpha = (c: string): number => Number(/\/ ([0-9.]+)\)/.exec(c)?.[1] ?? 1);
+  const luma = (c: string): number => {
+    const [r, g, b] = rgb(c);
+    return 0.3 * r! + 0.59 * g! + 0.11 * b!;
+  };
+  const paths = (prims: readonly Primitive[]): Extract<Primitive, { kind: 'path' }>[] =>
+    prims.flatMap((p) => (p.kind === 'path' ? [p] : p.kind === 'group' ? paths(p.children) : []));
+  /** 濾鏡算出的透明度：斜率 × 雜訊 + 截距，限制在 0～1。 */
+  const mottleAlpha = (t: StainTexture, noise: number): number => Math.max(0, Math.min(1, t.mottle[0] * noise + t.mottle[1]));
+  const BLOOD = ['blood-splatter', 'blood-drip', 'blood-smear', 'handprint'] as const;
 
-  it('血跡分新鮮與乾涸：新鮮偏鮮紅，乾涸偏褐，都是紅大於綠藍', () => {
+  it('血跡分新鮮與乾涸：新鮮偏鮮紅，乾涸偏褐，都是紅大於綠藍；顏色不透明，重疊處不會疊出深色接縫', () => {
     const fresh = bloodPalette(false);
     const dry = bloodPalette(true);
     for (const pal of [fresh, dry]) for (const c of Object.values(pal)) {
       const [r, g, b] = rgb(c);
       assert.ok(r! > g! && r! > b!, c);
+      assert.equal(alpha(c), 1, c);
     }
     // 乾涸的綠色成分較高（偏褐），新鮮的較純紅
     assert.ok(rgb(dry.mid)[1]! > rgb(fresh.mid)[1]!);
-    assert.notDeepEqual(decorationShape('blood-splatter', 5, '', true), decorationShape('blood-splatter', 5, '', false));
+    for (const type of BLOOD) assert.notDeepEqual(decorationShape(type, 5, '', true), decorationShape(type, 5, '', false), type);
   });
 
-  it('噴濺：中心淡邊緣深的漸層、不規則邊緣、大小不一的衛星血點與拉長血滴', () => {
+  it('血跡沒有外框：噴濺、滴落、拖痕的本體都不描邊，也沒有和本體同形狀的框線', () => {
+    for (const seed of [1, 2, 3, 4, 5]) {
+      for (const type of ['blood-splatter', 'blood-drip', 'blood-smear'] as const) {
+        const prims = paths(decorationShape(type, seed, '', true).primitives);
+        const filled = new Set(prims.filter((p) => p.fill !== 'none').map((p) => p.d));
+        for (const p of prims) {
+          assert.ok(!(p.fill === 'none' && filled.has(p.d)), `${type} 有一圈外框`);
+          // 只有拖痕的刷痕是描邊，而且是開放的細線，不是封閉的框
+          if (p.stroke) {
+            assert.equal(type, 'blood-smear');
+            assert.ok(!p.d.endsWith('Z') && (p.width ?? 0) < 0.6);
+          }
+        }
+      }
+    }
+  });
+
+  it('邊緣不規則、略柔和，內部由雜訊控制透明度而斑駁；乾涸的比新鮮的斑駁', () => {
+    for (const type of BLOOD) {
+      for (const dry of [true, false]) {
+        const t = decorationShape(type, 9, '', dry).texture;
+        assert.ok(t, `${type} 要有污漬質感`);
+        assert.ok(t.warp > 0 && t.warpFrequency > 0, '邊緣要擾動成不規則');
+        assert.ok(t.soften > 0 && t.soften < 0.3, '邊緣略柔和但不糊掉');
+        assert.ok(mottleAlpha(t, 0.65) - mottleAlpha(t, 0.35) > 0.3, `${type} 斑駁不夠：透明度起伏太小`);
+        assert.ok(mottleAlpha(t, 0.5) > 0.75, `${type} 大部分要夠濃`);
+        assert.ok(Number.isInteger(t.seed));
+      }
+      const dry = decorationShape(type, 9, '', true).texture!;
+      const fresh = decorationShape(type, 9, '', false).texture!;
+      assert.ok(mottleAlpha(dry, 0.35) < mottleAlpha(fresh, 0.35), `${type}：乾涸的較斑駁`);
+    }
+    // 雜訊種子跟著裝飾的種子走（「換一個」會換質感）
+    assert.notEqual(decorationShape('blood-splatter', 1, '').texture?.seed, decorationShape('blood-splatter', 2, '').texture?.seed);
+  });
+
+  it('噴濺：中心淺邊緣略深的漸層、往外的尖刺、大小不一的衛星血點與拉長血滴', () => {
     const shape = decorationShape('blood-splatter', 21, '', true);
     const grad = shape.gradients?.[0];
-    assert.ok(grad);
-    const alpha = (c: string): number => Number(/\/ ([0-9.]+)\)/.exec(c)?.[1]);
-    assert.ok(alpha(grad.stops[0]![1]) < alpha(grad.stops[grad.stops.length - 1]![1]), '中心要比邊緣淡');
-    assert.ok(shape.primitives.some((p) => p.kind === 'path' && p.filter === 'rough'));
-    const drops = shape.primitives.filter((p) => p.kind === 'path' && p.fill !== 'none' && !p.fill.startsWith('grad:'));
+    assert.ok(grad?.kind === 'radial');
+    const stops = grad.stops.map(([, c]) => c);
+    assert.ok(luma(stops[0]!) > luma(stops[stops.length - 1]!), '中心要比邊緣淺');
+    assert.ok(luma(stops[0]!) - luma(stops[stops.length - 1]!) < 40, '邊緣只略深，不是一圈深框');
+    const drops = paths(shape.primitives).filter((p) => !p.fill.startsWith('grad:'));
     assert.ok(drops.length >= 40, `只有 ${drops.length} 個血點`);
-    assert.ok(shape.primitives.some((p) => p.kind === 'path' && p.filter === 'fine'), '要有拉長的血滴');
+    // 淚滴形（尖刺與拉長血滴）是多邊形，圓點用弧線
+    assert.ok(drops.filter((p) => p.d.includes('L')).length >= 6, '要有尖刺與拉長的血滴');
   });
 
-  it('滴落有淚滴形與流痕；拖痕有斷續的刷痕', () => {
-    const drip = decorationShape('blood-drip', 3, '', false);
-    assert.ok(drip.primitives.filter((p) => p.kind === 'path' && p.filter === 'fine').length >= 4);
+  it('滴落有流痕與淚滴形血珠；拖痕整塊漸淡、有斷續的刷痕', () => {
+    const drip = paths(decorationShape('blood-drip', 3, '', false).primitives);
+    assert.ok(drip.filter((p) => !p.fill.startsWith('grad:')).length >= 4);
     const smear = decorationShape('blood-smear', 3, '', true);
-    const streaks = smear.primitives.filter((p) => p.kind === 'path' && p.fill === 'none' && p.stroke);
+    const fade = smear.gradients?.find((g) => g.kind === 'linear');
+    assert.ok(fade, '抹痕本體用沿拖曳方向的漸層');
+    assert.ok(alpha(fade.stops[0]![1]) > alpha(fade.stops[fade.stops.length - 1]![1]) * 5, '越往後越淡');
+    const streaks = paths(smear.primitives).filter((p) => p.fill === 'none' && p.stroke);
     assert.ok(streaks.length >= 18);
-    assert.ok(streaks.some((p) => p.kind === 'path' && p.dash), '刷痕要斷斷續續');
+    assert.ok(streaks.some((p) => p.dash), '刷痕要斷斷續續');
   });
 
-  it('血手印：掌與五指，遮罩留出掌紋、指節與缺塊', () => {
-    const shape = decorationShape('handprint', 8, '', true);
-    const filled = shape.primitives.filter((p) => p.kind === 'path' && p.fill !== 'none');
-    assert.ok(filled.length >= 1 + 5 * 2, '掌、五指與指尖');
-    const mask = shape.mask ?? [];
-    assert.equal(mask[0]?.kind === 'path' && mask[0].fill, 'white');
-    assert.ok(mask.filter((p) => p.kind === 'path' && p.stroke === 'black').length >= 3 + 9, '掌紋三條＋指節');
-    assert.ok(mask.filter((p) => p.kind === 'path' && p.fill === 'black').length >= 2, '按壓不均的缺塊');
+  it('血手印：像按壓的印子，沒有外框、沒有白色橫條與白點；輕重不均、指尖有紋路、有缺塊、往一個方向拖抹', () => {
+    for (const seed of [8, 9, 10]) {
+      for (const dry of [true, false]) {
+        const shape = decorationShape('handprint', seed, '', dry);
+        // 本體只有一塊血色，形狀全在遮罩裡
+        assert.equal(shape.primitives.length, 1);
+        assert.ok(paths(shape.primitives).every((p) => !p.stroke));
+        const mask = shape.mask ?? [];
+        const all = paths(mask);
+        assert.ok(!all.some((p) => p.fill === 'white'), '不能有白點');
+        const [print, ridges] = mask;
+        assert.ok(print?.kind === 'group' && (print.blur ?? 0) > 0, '壓痕整組略模糊');
+        assert.ok(ridges?.kind === 'group');
+        // 壓痕：灰階代表輕重，指尖重、掌心凹處輕
+        const level = (c: string): number => rgb(c)[0]! / 255;
+        const pads = paths(print.children).filter((p) => p.fill.startsWith('rgb('));
+        const levels = pads.map((p) => level(p.fill));
+        assert.ok(new Set(levels.map((l) => l.toFixed(2))).size >= 10, '輕重要不均');
+        assert.ok(levels.some((l) => l >= 0.88), '指尖按得重');
+        assert.ok(levels.some((l) => l > 0.15 && l <= 0.45), '掌心凹處輕');
+        // 拖抹：殘影（很淡的同形狀）至少五層，另有拖痕細線
+        assert.ok(levels.filter((l) => l < 0.3).length >= 5 * 15, '要有往一個方向的殘影');
+        assert.ok(paths(print.children).filter((p) => p.fill === 'none' && p.stroke?.startsWith('rgb(')).length >= 10, '要有拖痕');
+        // 指尖的紋路：五個指尖、每個至少兩圈，黑色半透明細線
+        const lines = paths(ridges.children);
+        assert.ok(lines.length >= 5 * 2);
+        assert.ok(lines.every((p) => p.stroke === 'black' && (p.opacity ?? 1) < 0.6 && (p.width ?? 1) < 0.2));
+        // 隨機缺塊
+        assert.ok(paths(print.children).some((p) => p.fill === 'black'), '要有缺塊');
+        assert.equal(shape.texture?.soften !== undefined && shape.texture.soften < 0.1, true, '指紋才不會被模糊掉');
+      }
+    }
   });
 
   it('抓痕：三到四道，頭尾尖細，中間露出淺色纖維', () => {

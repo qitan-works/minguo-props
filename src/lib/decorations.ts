@@ -252,7 +252,7 @@ function handprint(rng: Rng, pal: BloodPalette): { prims: Primitive[]; grads: Gr
       const cy = f.y + Math.sin(a) * len * k;
       const px = -Math.sin(a) * f.w0 * 0.55;
       const py = Math.cos(a) * f.w0 * 0.55;
-      mask.push({ kind: 'path', d: `M${(cx - px).toFixed(2)} ${(cy - py).toFixed(2)}L${(cx + px).toFixed(2)} ${(cy + py).toFixed(2)}`, fill: 'none', stroke: 'black', width: range(rng, 0.25, 0.45), cap: 'round' });
+      mask.push({ kind: 'path', d: wobbly(rng, [{ x: cx - px, y: cy - py }, { x: cx - px * 0.3, y: cy - py * 0.3 + range(rng, -0.2, 0.2) }, { x: cx + px, y: cy + py }], 0.08), fill: 'none', stroke: 'black', width: range(rng, 0.14, 0.26), cap: 'round', dash: `${range(rng, 0.8, 2).toFixed(2)} ${range(rng, 0.2, 0.6).toFixed(2)}` });
     }
   });
   // 掌紋：感情線、智慧線、生命線
@@ -261,7 +261,7 @@ function handprint(rng: Rng, pal: BloodPalette): { prims: Primitive[]; grads: Gr
     [{ x: -7.4, y: 4.2 }, { x: -3, y: 5.6 }, { x: 2, y: 6.8 }, { x: 6.5, y: 9 }],
     [{ x: -6.8, y: 4.4 }, { x: -4.4, y: 8.5 }, { x: -3.2, y: 12 }, { x: -2.6, y: 13.6 }],
   ];
-  for (const l of lines) mask.push({ kind: 'path', d: wobbly(rng, l, 0.18), fill: 'none', stroke: 'black', width: range(rng, 0.35, 0.6), cap: 'round' });
+  for (const l of lines) mask.push({ kind: 'path', d: wobbly(rng, l, 0.22), fill: 'none', stroke: 'black', width: range(rng, 0.18, 0.34), cap: 'round', dash: `${range(rng, 2, 5).toFixed(2)} ${range(rng, 0.3, 1).toFixed(2)}` });
   // 按壓不均：幾塊缺失與許多細小白點
   for (let i = 0, n = int(rng, 2, 5); i < n; i++) {
     mask.push({ kind: 'path', d: poly(blobPolygon(rng, range(rng, -7, 7), range(rng, -8, 13), range(rng, 0.8, 2.6), 0.45, 14)), fill: 'black' });

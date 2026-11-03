@@ -183,13 +183,15 @@ export function outlineTextSvg(text: readonly string[], r: Rect, size: number, d
     style: { left: mm(r.x), top: mm(r.y), width: mm(r.w), height: mm(r.h) },
   });
   const n = text.length;
+  // 直排時括號要轉成直的（CSS 直排會自動轉，SVG 的單字要自己轉 90 度）
+  const BRACKETS = new Set(Array.from('【】〔〕「」（）《》〈〉『』'));
   text.forEach((ch, i) => {
     const x = dir === 'v' ? r.w / 2 : r.w / 2 + ((n - 1) / 2 - i) * size;
     const y = dir === 'v' ? (i + 0.5) * size + Math.max(0, (r.h - n * size) / 2) : r.h / 2;
     svg.appendChild(
       s('text', {
         attrs: { x: x.toFixed(3), y: y.toFixed(3), 'font-size': size.toFixed(3), 'text-anchor': 'middle', 'dominant-baseline': 'central', fill: 'none', stroke: 'currentColor', 'stroke-width': (size * 0.055).toFixed(3), 'stroke-linejoin': 'round' },
-        style: { 'font-family': fontVar, 'font-weight': '900' },
+        style: { 'font-family': fontVar, 'font-weight': '900', ...(dir === 'v' && BRACKETS.has(ch) ? { transform: `rotate(90deg)`, 'transform-origin': `${x.toFixed(3)}px ${y.toFixed(3)}px`, 'transform-box': 'view-box' } : {}) },
         text: ch,
       }),
     );

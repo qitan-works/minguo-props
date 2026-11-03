@@ -458,6 +458,10 @@
   letter-spacing: 0.04em;
 }
 
+.nf-mh-rule {
+  border-top: 0.2mm solid currentColor;
+}
+
 .nf-mh-note {
   opacity: 0.85;
   letter-spacing: 0.08em;

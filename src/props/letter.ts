@@ -1,9 +1,18 @@
 // 信箋：欄位定義與預設內容。
 
 import { fontFields, paperOptions } from './common.ts';
-import { FONT_OPTIONS } from '../fonts.ts';
+import { FONTS, FONT_OPTIONS } from '../fonts.ts';
 import { conditionDefaults, conditionFields } from './conditions.ts';
 import type { DataOf, Field } from './schema.ts';
+
+/** 偏好清單裡第一個已收錄的字型（第三版的手寫字型在字型 PR 合併後才有，沒有時退回原本的字型）。 */
+function firstFont(prefs: readonly string[], fallback: string): string {
+  return prefs.find((id) => FONTS.some((f) => f.id === id)) ?? fallback;
+}
+
+/** 信箋預設的手寫字型：鋼筆行楷；越寫越亂的後半段換成清松手寫體 7（飄逸）。 */
+const HAND_DEFAULT = firstFont(['wang-gangbi-xingkai', 'jason-xingkai'], 'lxgw');
+const MAD_FONT_DEFAULT = firstFont(['jason-piaoyi', 'jason-suixing'], '');
 
 /** 強度大於 0 時才顯示的選項（showIf 只能比對固定值，所以列出所有非 0 的刻度）。 */
 const MADNESS_ON = Array.from({ length: 20 }, (_, i) => (i + 1) * 5);
@@ -99,9 +108,9 @@ export const letterDefaults: LetterData = {
   madRepeat: false,
   madOverflow: false,
   madFillPage: false,
-  madFont: '',
+  madFont: MAD_FONT_DEFAULT,
   fontTitle: 'noto-serif',
   fontBody: 'noto-serif',
-  fontHand: 'lxgw',
+  fontHand: HAND_DEFAULT,
   ...conditionDefaults({ aging: 'light', folds: true, foldStyle: 'thirds', stains: true, effectSeed: 61493 }),
 };

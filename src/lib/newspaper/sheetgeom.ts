@@ -8,7 +8,7 @@
 // 報眉是版面最上方一條細欄（第幾張、日期、報名、第幾版）。
 
 import type { Rect } from '../geometry.ts';
-import type { Obstacle } from './broadsheet.ts';
+import type { Obstacle } from './sections.ts';
 import { cellSizeFor } from './page.ts';
 
 export type MastheadLayout = 'right' | 'corner-right' | 'corner-left' | 'top' | 'none';
@@ -48,11 +48,13 @@ export interface BroadsheetGeometryOptions {
   readonly layout: MastheadLayout;
   readonly header: boolean;
   readonly margin?: number;
+  /** 內文字高（公釐）；不給時依紙張大小。 */
+  readonly cell?: number;
 }
 
 export function broadsheetGeometry(o: BroadsheetGeometryOptions): BroadsheetGeometry {
   const margin = o.margin ?? 8;
-  const cell = cellSizeFor(o.width, o.height);
+  const cell = o.cell ?? cellSizeFor(o.width, o.height);
   const pitch = Math.round(cell * 1.14 * 1000) / 1000;
   let top = margin;
   let header: Rect | null = null;

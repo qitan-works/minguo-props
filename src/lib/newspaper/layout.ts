@@ -1,5 +1,5 @@
 // 報紙排版的共用小工具（純邏輯）：素材區塊的型別、斷行（避頭點、避尾點）與全形轉換。
-// 第三版的不規則整版排版在 broadsheet.ts 與 flow.ts。
+// 第四版的分段網格整版排版在 sections.ts 與 flow.ts。
 
 export type BlockKind = 'news' | 'short' | 'ad' | 'notice' | 'list' | 'tiny' | 'photo';
 

@@ -4,6 +4,7 @@ import { fontFields, paperOptions } from './common.ts';
 import { ERAS, eraPatch } from './eras.ts';
 import { MASTHEAD_LAYOUTS } from '../lib/newspaper/sheetgeom.ts';
 import { PUNCTUATION_MODES } from '../lib/newspaper/punctuation.ts';
+import { PAGE_TYPES } from '../lib/newspaper/pageplan.ts';
 import { conditionDefaults, conditionFields } from './conditions.ts';
 import { CUT_STYLES } from '../lib/cutline.ts';
 import type { DataOf, Field } from './schema.ts';
@@ -69,19 +70,32 @@ export const newspaperFields = [
     ],
   },
   {
-    key: 'pageTiers',
-    type: 'range',
-    label: '整版分段',
+    key: 'pageType',
+    type: 'select',
+    label: '版面類型',
     group: '版面',
-    min: 3,
-    max: 8,
-    step: 1,
-    unit: '段',
-    hint: '段數越多，每行字越少。',
-    showIf: { key: 'fit', in: ['full', 'cut'] },
+    hint: '決定這一版有哪些區塊、各占多少；可和年代預設組合。在預覽上點一個區塊，可以個別設定它。',
+    options: PAGE_TYPES,
+    showIf: FULL,
+  },
+  {
+    key: 'sections',
+    type: 'select',
+    label: '分段',
+    group: '版面',
+    hint: '一版由上而下分成幾段，段與段之間有段線。段數越多，每行字越少。',
+    options: [
+      { value: 'auto', label: '自動（A4 直式十段，其餘八、九段）' },
+      { value: '8', label: '八段' },
+      { value: '9', label: '九段' },
+      { value: '10', label: '十段' },
+      { value: '11', label: '十一段' },
+      { value: '12', label: '十二段' },
+    ],
+    showIf: FULL,
   },
   { key: 'fillSeed', type: 'seed', label: '填版素材', button: '換一批', group: '版面', hint: '在預覽上點一則素材可以鎖定或刪除。', showIf: FULL },
-  { key: 'layoutSeed', type: 'seed', label: '版面配置', button: '換一個', group: '版面', hint: '區塊的高低寬窄、廣告位置與欄名。', showIf: FULL },
+  { key: 'layoutSeed', type: 'seed', label: '版面配置', button: '換一個', group: '版面', hint: '區塊的種類、高低寬窄與樣式；鎖定的區塊保留。', showIf: FULL },
   { key: 'punctuation', type: 'select', label: '句讀', group: '版面', options: PUNCTUATION_MODES, showIf: FULL },
   { key: 'mainHorizontal', type: 'checkbox', label: '主新聞標題橫排（由右而左）', group: '版面', showIf: FULL },
   {
@@ -158,7 +172,8 @@ export const newspaperDefaults: NewspaperData = {
   era: '1920s',
   paper: 'a4-portrait',
   fit: 'full',
-  pageTiers: 5,
+  pageType: 'news',
+  sections: 'auto',
   fillSeed: 19281105,
   layoutSeed: 1105,
   punctuation: ERA_DEFAULT?.punctuation ?? 'circle',

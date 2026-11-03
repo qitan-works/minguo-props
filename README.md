@@ -6,6 +6,8 @@
 
 純前端靜態網頁：沒有後端、不需要帳號、不收集任何資料。
 
+**線上版：<https://qitan-works.github.io/minguo-props/>**（GitHub Pages；`main` 每次更新後自動建置、測試並部署）
+
 | 整版報紙 | 從整版剪下 | 電報 | 信箋 | 名片／請帖 |
 | --- | --- | --- | --- | --- |
 | ![整版報紙](docs/samples/newspaper-full.jpg) | ![剪報](docs/samples/cut-torn.jpg) | ![電報](docs/samples/telegram.jpg) | ![信箋](docs/samples/letter.jpg) | ![名片](docs/samples/card.jpg) ![請帖](docs/samples/invitation.jpg) |
@@ -64,8 +66,10 @@
 
 ## 怎麼用
 
-把建置好的 `dist/` 放到任何靜態網站伺服器（GitHub Pages、Netlify、自己的主機都可以），用瀏覽器開啟即可。
-也可以在本機執行（見下方「本機開發」）。
+直接開啟線上版 <https://qitan-works.github.io/minguo-props/> 即可。
+
+也可以把建置好的 `dist/` 放到任何靜態網站伺服器（Netlify、自己的主機都可以），或在本機執行（見下方「本機開發」）。
+所有資源都用相對路徑，放在網站的子路徑下（例如 `/minguo-props/`）也能正常運作。
 
 > 因為使用 ES 模組並以 `fetch` 讀取電碼表，請透過網址（`http://` 或 `https://`）開啟，
 > 直接雙擊 `dist/index.html`（`file://`）大多數瀏覽器會擋下。
@@ -112,6 +116,10 @@
 - 你填寫的內容與照片只存在你自己的瀏覽器（localStorage）與你匯出的 JSON 檔裡，不會上傳。
 - 照片用 FileReader 讀進瀏覽器、以 canvas 縮小後重新編碼；這一步也會去掉相機寫入的 EXIF（例如拍攝地點）。
 - 「清除本機資料」按鈕會刪除這個網站存在你瀏覽器裡的全部內容。
+- 線上版由 GitHub Pages 託管：網站本身沒有任何分析或追蹤，但 GitHub 作為主機會依它自己的隱私權政策處理連線紀錄（例如 IP 位址）。
+  不想經過 GitHub 的話，可以下載原始碼在本機執行。
+- 瀏覽器的 localStorage 是以網域區分的：`qitan-works.github.io` 底下的其他專案頁面和本網站屬於同一個網域，
+  技術上讀得到這裡存的內容。請不要在道具裡放真正的個人資料；需要保存的內容建議匯出 JSON 自己保管。
 
 ## 資料與字型的來源和授權
 
@@ -184,18 +192,36 @@ pnpm build
 pnpm serve
 ```
 
-開啟 <http://127.0.0.1:4173/>。其他指令：
+開啟 <http://127.0.0.1:4173/>。想模擬 GitHub Pages 的子路徑時：
+
+```bash
+BASE=/minguo-props/ pnpm serve
+```
+
+開啟 <http://127.0.0.1:4173/minguo-props/>；這時根路徑一律 404，可以確認沒有資源用到根路徑。其他指令：
 
 | 指令 | 說明 |
 | --- | --- |
 | `pnpm typecheck` | TypeScript 型別檢查（strict） |
-| `pnpm test` | 以 Node 內建的 `node --test` 測試純邏輯：電碼查詢、民國紀年、中文數字、韻目代日、存檔格式、亂數種子、剪線與切片幾何、整版排版、保護區判斷、字型清單與授權一致性、字數檢查、ZIP 與 WOFF2 解析等 |
-| `pnpm build` | 編譯並輸出靜態網站到 `dist/` |
-| `pnpm serve` | 只綁定 127.0.0.1 的本機預覽伺服器（提供 `dist/`） |
+| `pnpm test` | 以 Node 內建的 `node --test` 測試純邏輯：電碼查詢、民國紀年、中文數字、韻目代日、存檔格式、亂數種子、剪線與切片幾何、整版排版、保護區判斷、字型清單與授權一致性、字數檢查、ZIP 與 WOFF2 解析、網址都是相對路徑等 |
+| `pnpm build` | 編譯並輸出靜態網站到 `dist/`；產物裡只要有以「/」開頭的網址就中止 |
+| `pnpm serve` | 只綁定 127.0.0.1 的本機預覽伺服器（提供 `dist/`；`BASE` 環境變數可指定子路徑） |
 | `pnpm data:telegraph` | 從 unicode.org 下載 `Unihan.zip` 並重新產生 `src/data/telegraph.json` 與 `src/data/big5-level1.json` |
 | `pnpm data:check` | 重新產生並與已提交的電碼資料比對（不寫入） |
 
 `pnpm data:telegraph --zip 路徑/Unihan.zip` 可改用本機已下載的 `Unihan.zip`（一樣會驗證 SHA-256）。
+
+### 部署（GitHub Pages）
+
+`.github/workflows/pages.yml` 只在推送 `main`（PR 合併後）與手動觸發時執行，網址是 <https://qitan-works.github.io/minguo-props/>。
+
+1. **建置**（只有 `contents: read` 權限）：和 CI 相同的 `pnpm install --frozen-lockfile`、型別檢查、測試、建置，
+   全部通過才用 `actions/upload-pages-artifact` 把 `dist/` 打包上傳。
+2. **部署**（只有 `pages: write` 與 `id-token: write`，使用 `github-pages` 環境，只部署 `main`）：
+   `actions/configure-pages` 確認 Pages 的來源設為 GitHub Actions，再由 `actions/deploy-pages` 部署。
+
+工作流程預設不給任何權限，每個 job 只拿自己需要的；不使用任何機密，checkout 設 `persist-credentials: false`，
+每個 action 都以完整 commit SHA 釘選並註明版本。部署不加任何分析或追蹤，頁面的 Content-Security-Policy 與本機相同。
 
 ### 專案結構
 
@@ -213,6 +239,7 @@ src/
   styles/             介面、道具與列印樣式
   data/               電碼資料、Big5 常用字表（由腳本產生）、填版素材
 scripts/              建置、本機伺服器、電碼資料產生腳本
+.github/workflows/    CI、電碼資料比對、GitHub Pages 部署
 test/                 node --test 測試
 licenses/             第三方授權全文
 ```
@@ -224,6 +251,7 @@ licenses/             第三方授權全文
 - `pnpm-workspace.yaml` 設定 `minimumReleaseAge: 10080`（新版本發布滿 7 天才會被安裝）、
   `trustPolicy: no-downgrade`，並禁止任何依賴執行安裝腳本。
 - CI 只有讀取權限、不使用任何機密；每個 GitHub Action 都以完整 commit SHA 釘選。
+  GitHub Pages 部署的建置也只有讀取權限，只有最後的部署步驟有 `pages: write` 與 `id-token: write`。
 - Dependabot 每週檢查 npm 與 GitHub Actions，並設定 7 天冷卻期。
 - 不使用 Python；建置、資料處理與測試都只用 Node.js 與 TypeScript。
 

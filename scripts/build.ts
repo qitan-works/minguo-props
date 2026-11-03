@@ -10,6 +10,7 @@ import { createHash } from 'node:crypto';
 
 import { FONTS } from '../src/fonts.ts';
 import { rewriteFontCss } from './lib/fonts.ts';
+import { findRootUrls, kindOf } from './lib/relative-urls.ts';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const dist = path.join(root, 'dist');
@@ -68,6 +69,23 @@ async function dirSize(dir: string): Promise<{ files: number; bytes: number }> {
   return { files, bytes };
 }
 
+/** 網站部署在子路徑下（GitHub Pages），產物裡只要有一個根路徑網址就中止建置。 */
+async function assertRelativeUrls(): Promise<void> {
+  const problems: string[] = [];
+  for (const entry of await readdir(dist, { withFileTypes: true, recursive: true })) {
+    if (!entry.isFile()) continue;
+    const kind = kindOf(entry.name);
+    if (!kind) continue;
+    const file = path.join(entry.parentPath, entry.name);
+    for (const ref of findRootUrls(await readFile(file, 'utf8'), kind)) {
+      problems.push(`  ${path.relative(dist, file)}:${ref.line}  ${ref.match}`);
+    }
+  }
+  if (problems.length > 0) {
+    throw new Error(`dist/ 裡有以「/」開頭的網址，部署在子路徑下會找不到檔案，請改用相對路徑：\n${problems.join('\n')}`);
+  }
+}
+
 async function main(): Promise<void> {
   await rm(dist, { recursive: true, force: true });
 
@@ -81,6 +99,8 @@ async function main(): Promise<void> {
   await copyInto(path.join(root, 'LICENSE'), path.join(dist, 'licenses', 'LICENSE.txt'));
   await copyInto(path.join(root, 'THIRD_PARTY_NOTICES.md'), path.join(dist, 'licenses', 'THIRD_PARTY_NOTICES.txt'));
   await copyDir(path.join(root, 'licenses'), path.join(dist, 'licenses'), (n) => n.endsWith('.txt'));
+
+  await assertRelativeUrls();
 
   const { files, bytes } = await dirSize(dist);
   console.log(`建置完成：dist/（${files} 個檔案，${(bytes / 1024 / 1024).toFixed(1)} MB）`);

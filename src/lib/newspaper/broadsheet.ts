@@ -283,17 +283,21 @@ function pack(input: BroadsheetInput, rng: Rng): Packing {
           break;
         }
       }
-      let result = tryWidth(width, true);
-      if (result.laid && result.laid.used < width) {
-        width = Math.max(minW, result.laid.used);
-        result = tryWidth(width, true);
-      }
+      const result = tryWidth(width, true);
       const columns = rect(seg.c0, width, seg.s, seg.s + h);
       const band = result.band;
       const slots = slotsFor(columns, gap + (band?.rows ?? 0));
       if (!result.laid || result.laid.truncated) overflow = true;
-      addRegion({ kind: 'main', columns, gapTop: gap > 0, ...(band ? { band: { ...band, itemId: mainItem.id, source: mainItem.source } } : {}), slots, lines: result.laid?.lines ?? [] });
+      const lines: FlowLine[] = [...(result.laid?.lines ?? [])];
       used.push(mainItem.id);
+      // 主新聞排完還剩一兩行：接著排短訊或一行小訊（當年的報紙也常這樣），不留空行
+      const start = result.laid?.used ?? 0;
+      if (start < slots.length) {
+        const flowed = flowRegion(slots.slice(start), queue, { mode: input.mode, tiny, lookahead: 14 });
+        lines.push(...flowed.lines.map((l) => ({ ...l, slot: l.slot + start })));
+        used.push(...flowed.used);
+      }
+      addRegion({ kind: 'main', columns, gapTop: gap > 0, ...(band ? { band: { ...band, itemId: mainItem.id, source: mainItem.source } } : {}), slots, lines });
     }
   }
 

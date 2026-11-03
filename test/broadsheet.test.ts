@@ -133,6 +133,15 @@ describe('整版不規則版面', () => {
     for (const id of second.usedIds) if (!id.startsWith('t')) assert.equal(used.has(id), false, id);
   });
 
+  it('預設內容在四種紙張、五種報頭位置都放得下（不截斷主新聞）', () => {
+    for (const [width, height] of [[210, 297], [297, 210], [148, 210], [210, 148]] as const) {
+      for (const layout of LAYOUTS) {
+        const { b } = page({ width, height, layout });
+        assert.equal(b.overflow, false, `${width}×${height} ${layout}`);
+      }
+    }
+  });
+
   it('A5 與 A4 橫式也排得滿', () => {
     for (const [width, height] of [[148, 210], [297, 210]] as const) {
       const { b } = page({ width, height, layout: 'corner-right' });

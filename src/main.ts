@@ -765,7 +765,7 @@ els.stage.addEventListener(
 
 async function loadCodebook(): Promise<void> {
   try {
-    const res = await fetch('data/telegraph.json');
+    const res = await fetch(new URL('../data/telegraph.json', import.meta.url));
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const json = (await res.json()) as { codes?: unknown; variants?: unknown };
     if (typeof json.codes !== 'object' || json.codes === null) throw new Error('格式不符');

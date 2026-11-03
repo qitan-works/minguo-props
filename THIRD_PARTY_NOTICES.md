@@ -38,6 +38,8 @@ Unicode and the Unicode Logo are registered trademarks of Unicode, Inc. in the U
 
 ## 其他
 
-- 紙張做舊效果（泛黃、摺痕、污漬、紙紋、印泥）全部以 CSS 漸層與 SVG 濾鏡即時產生，
-  沒有使用任何圖片素材。
+- 紙張狀況（泛黃、紙紋、紙邊、破洞、浸水、摺痕、揉皺、斑點、霉斑等）與裝飾（血跡、戳記、怪符號等）全部以 CSS、
+  SVG 與程式即時產生，沒有使用任何圖片素材；怪符號是程式隨機組合的原創圖形，不取材自任何現有作品。
+- 報紙填版素材（`src/data/fillers.ts` 與 `src/lib/newspaper/fillers.ts`）全部為本專案原創、虛構，
+  不含真實報紙文字、商號、藥名、品牌或人名，隨程式碼以 MIT 授權釋出。
 - 執行期沒有任何第三方 JavaScript 函式庫。

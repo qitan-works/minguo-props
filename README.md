@@ -185,10 +185,13 @@
 
 ### 字型
 
-每套都以 woff2 檔的 cmap 實際檢查字數：涵蓋教育部〈常用國字標準字體表〉4,808 字中的 4,807 字（唯一缺的「甽」是 Google Fonts 的切片沒有收，
-五套都缺，瀏覽器會改用系統字型顯示），也能顯示所有預設與填版文字。檢查用的 Big5 常用字表（`src/data/big5-level1.json`）由同一份 Unihan 資料產生。
-字型版本釘選在 `package.json`，建置時驗證每套字型 woff2 檔的 SHA-256（登記在 `src/fonts.ts`）。
+每套字型都以字型檔的 cmap 實際檢查字數（Big5 常用字 5,401 字與所有預設、填版文字），缺的字登記在 `src/fonts.ts`，
+瀏覽器會改用備援字型顯示。檢查用的 Big5 常用字表（`src/data/big5-level1.json`）由同一份 Unihan 資料產生。
+建置時驗證每套字型檔的 SHA-256（登記在 `src/fonts.ts`），不符就中止。`@font-face` 搭配 `unicode-range`：
+只有選用的字型、而且只有用到的字所在的分片才會下載。
 
+**Fontsource 套件**（只在建置時讀取，版本釘選在 `package.json`；`pnpm build` 把依 Unicode 範圍切好的 woff2 分片複製到 `dist/fonts/`）。
+五套都涵蓋教育部〈常用國字標準字體表〉4,808 字中的 4,807 字（唯一缺的「甽」是 Google Fonts 的切片沒有收）。
 
 | 字型 | 風格 | 來源套件（版本） | 授權全文 |
 | --- | --- | --- | --- |
@@ -198,14 +201,42 @@
 | 芫荽 Iansui | 鋼筆手寫 | `@fontsource/iansui` 5.3.1 | [`licenses/OFL-Iansui.txt`](licenses/OFL-Iansui.txt) |
 | jf open 粉圓 Huninn | 現代圓體（不太像民國，但可選） | `@fontsource/huninn` 5.3.1 | [`licenses/OFL-Huninn.txt`](licenses/OFL-Huninn.txt) |
 
-字型套件只在建置時讀取，`pnpm build` 會把依 Unicode 範圍切好的 woff2 分片複製到 `dist/fonts/`。
-`@font-face` 搭配 `unicode-range`：只有選用的字型、而且只有用到的字所在的分片才會下載。
+**自行處理的字型**（提交在 `fonts/`，由 `pnpm fonts:generate` 從釘選的原始檔產生，共 27.9 MB）。
+王漢宗與清松手寫體切成子集：Big5 常用字＋預設與填版文字用到的字＋標點與報紙常用符號；第 0 片放預設與填版文字用到的字，
+只看預設內容時每套字型只下載這一片（約 0.3～0.6 MB），其餘每片約 200 KB。來源網址、SHA-256 與授權細節見 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)。
 
-查過但沒有收的字型：辰宇落雁體（授權保留字型名稱，自行切片屬修改版需改名，也沒有預先切好的發布）、
-清松手寫體（授權只寫「SIL Open Font License」未載明版本、沒有授權檔，也缺「卽」等字）、
-源樣明體（只有 16 MB 的 OTF 與第三方個人維護的切片套件；不用 Python 的情況下這一版未實作自行切片）、
-柳建毛草、志莽行書（只有簡體中文，缺「霧」「電」「報」「總」「聲」等繁體字）、
-Chiron Sung HK（Fontsource 套件裡是未壓縮的 TTF、全套 16.8 MB，且為香港字形）。授權全文在 [`licenses/`](licenses/)，彙整見 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)。
+| 字型 | 風格 | 來源（版本） | 授權 | 輸出 |
+| --- | --- | --- | --- | --- |
+| 王漢宗中明體 | 明體（內文） | 王漢宗自由字型 1.3.0 `wt002.ttf` | GPL-2.0-or-later，[`licenses/GPL-2.0.txt`](licenses/GPL-2.0.txt) | 7 片，1.41 MB |
+| 王漢宗特明體 | 粗明體（標題） | 王漢宗自由字型 1.3.0 `wt004.ttf` | GPL-2.0-or-later | 8 片，1.73 MB |
+| 王漢宗超明體 | 特粗明體（報頭、大標） | 王漢宗自由字型 1.3.0 `wt005.ttf` | GPL-2.0-or-later | 7 片，1.57 MB |
+| 王漢宗特黑體 | 粗黑體（廣告大字） | 王漢宗自由字型 1.3.0 `wt014.ttf` | GPL-2.0-or-later | 6 片，1.13 MB |
+| 王漢宗中隸書 | 隸書 | 王漢宗自由字型 1.3.0 `wt021.ttf` | GPL-2.0-or-later | 8 片，1.81 MB |
+| 王漢宗中仿宋 | 仿宋（公文、告示） | 王漢宗自由字型 1.3.0 `wt024.ttf` | GPL-2.0-or-later | 9 片，1.96 MB |
+| 王漢宗顏楷體 | 顏體楷書 | 王漢宗自由字型 1.3.0 `wt064.ttf` | GPL-2.0-or-later | 8 片，1.82 MB |
+| 王漢宗中行書 | 行書 | 王漢宗自由字型 1.3.0 `wt071.ttf` | GPL-2.0-or-later | 9 片，2.02 MB |
+| 王漢宗鋼筆行楷 | 鋼筆行楷（手寫） | 王漢宗自由字型 1.3.0 `wthc06.ttf` | GPL-2.0-or-later | 6 片，1.33 MB |
+| 清松手寫體5（行楷） | 原子筆手寫 | jasonhandwriting/JasonHandwriting `e488583` | OFL（視為 1.1），[`licenses/OFL-JasonHandwriting.txt`](licenses/OFL-JasonHandwriting.txt) | 12 片，2.66 MB |
+| 清松手寫體7（飄逸） | 原子筆手寫 | 同上 | OFL（視為 1.1） | 12 片，2.63 MB |
+| 清松手寫體8（隨性） | 原子筆手寫 | 同上 | OFL（視為 1.1） | 11 片，2.48 MB |
+| 辰宇落雁體 Thin | 細筆手寫 | Chenyu-otf/chenyuluoyan_thin `6e36815`（2.100） | OFL 1.1，[`licenses/OFL-Chenyuluoyan.txt`](licenses/OFL-Chenyuluoyan.txt) | 1 個檔，5.35 MB |
+
+- **王漢宗自由字型（GPL-2.0-or-later）**：字型是獨立的檔案，依 GPL 提供；網站程式碼仍以 MIT 授權釋出。
+  切過子集的字型是修改版，同樣以 GPL-2.0-or-later 提供：保留原有的著作權聲明（name 表全部保留），
+  在字型的 name 表說明欄（nameID 10）與 `dist/fonts/<字型>/SOURCE.txt` 註明修改（切子集、轉 WOFF2）與日期，
+  並指向原始字型 tarball（字型檔本身就是原始碼）。[`licenses/GPL-2.0.txt`](licenses/GPL-2.0.txt) 是 GPL 第 2 版全文。
+- **清松手寫體**：作者只寫「under SIL Open Font License」（沒有版本、沒有授權檔），原文照錄在授權檔與 THIRD_PARTY_NOTICES，
+  本專案視為 OFL 1.1。這三套沒有直排功能（`vert`）與直排標點字形，所以「，」「。」「「」」「（」等標點交給備援字型（霞鶩文楷），
+  直排時括號才會轉向。清松手寫體 7、8 在直排時上字的長筆畫會碰到下字，`src/fonts.ts` 登記了建議的直排字距（0.04、0.05em）。
+- **辰宇落雁體**：授權保留字型名稱「辰宇落雁」「Chenyuluoyan」，切子集就是修改版而必須改名，所以**原封不動**提供：
+  不切子集、不改名，只包成 WOFF 1.0、不加 WOFF 中繼資料（依 OFL-FAQ 1.1-update7 第 2.2.1 題，這樣不算修改版）。
+  代價是沒有分片，選用時要整個下載 5.35 MB。測試會確認解回來的字型與原檔逐位元組相同。
+- **列印成 PDF**：瀏覽器會把用到的字（字型子集）嵌入 PDF。這些道具是給個人列印使用的。
+
+查過但沒有收的字型（理由詳見 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)）：王漢宗自由字型的其他款式（勘亭流、綜藝、疊圓、海報、動物等）、
+清松手寫體 2（秀氣，缺 452 個 Big5 常用字）與其他現代可愛風格的款式、內海字體與小賴字體（衍生自瀨戶字體的現代可愛手寫風格，原檔 25 MB 以上）、
+源樣明體（只有 16 MB 的 OTF 與第三方個人維護的切片套件）、柳建毛草、志莽行書（只有簡體中文，缺「霧」「電」「報」「總」「聲」等繁體字）、
+Chiron Sung HK（Fontsource 套件裡是未壓縮的 TTF、全套 16.8 MB，且為香港字形）。授權全文在 [`licenses/`](licenses/)。
 
 ## 本機開發
 
@@ -235,11 +266,16 @@ BASE=/minguo-props/ pnpm serve
 | 指令 | 說明 |
 | --- | --- |
 | `pnpm typecheck` | TypeScript 型別檢查（strict） |
-| `pnpm test` | 以 Node 內建的 `node --test` 測試純邏輯：電碼查詢、民國紀年、中文數字、韻目代日、存檔格式、亂數種子、剪線與切片幾何、整版排版、保護區判斷、字型清單與授權一致性、字數檢查、ZIP 與 WOFF2 解析、網址都是相對路徑等 |
+| `pnpm test` | 以 Node 內建的 `node --test` 測試純邏輯：電碼查詢、民國紀年、中文數字、韻目代日、存檔格式、亂數種子、剪線與切片幾何、整版排版、保護區判斷、字型清單與授權一致性、字數檢查、字型分片與 unicode-range、ZIP、tar、WOFF2 與 WOFF 1.0 解析、網址都是相對路徑等 |
 | `pnpm build` | 編譯並輸出靜態網站到 `dist/`；產物裡只要有以「/」開頭的網址就中止 |
 | `pnpm serve` | 只綁定 127.0.0.1 的本機預覽伺服器（提供 `dist/`；`BASE` 環境變數可指定子路徑） |
 | `pnpm data:telegraph` | 從 unicode.org 下載 `Unihan.zip` 並重新產生 `src/data/telegraph.json` 與 `src/data/big5-level1.json` |
 | `pnpm data:check` | 重新產生並與已提交的電碼資料比對（不寫入） |
+| `pnpm fonts:generate` | 下載釘選的字型原始檔（快取在 `.cache/fonts/`）、驗證 SHA-256，切子集、分片、壓縮，寫入 `fonts/` 與 `fonts/manifest.json`；之後依提示更新 `src/fonts.ts` 的 SHA-256 等欄位 |
+| `pnpm fonts:check` | 重新產生到暫存目錄，與已提交的 `fonts/` 逐位元組比對（不寫入） |
+
+預設內容或填版素材用到字型沒收的新字時，`pnpm test` 會失敗並提示執行 `pnpm fonts:generate`
+（掃描的原始碼目錄列在 [`scripts/lib/text-chars.ts`](scripts/lib/text-chars.ts) 的 `TEXT_SOURCES`）。
 
 `pnpm data:telegraph --zip 路徑/Unihan.zip` 可改用本機已下載的 `Unihan.zip`（一樣會驗證 SHA-256）。
 
@@ -270,8 +306,9 @@ src/
   ui/                 表單產生器、照片處理、新聞條目、裁切、裝飾編輯、預覽選單
   styles/             介面、道具與列印樣式
   data/               電碼資料、Big5 常用字表（由腳本產生）、填版素材
-scripts/              建置、本機伺服器、電碼資料產生腳本
-.github/workflows/    CI、電碼資料比對、GitHub Pages 部署
+scripts/              建置、本機伺服器、電碼資料與字型產生腳本（tar、SFNT、WOFF 1.0、子集化、分片等工具在 scripts/lib/）
+fonts/                自行處理的字型與 manifest.json（由 pnpm fonts:generate 產生）
+.github/workflows/    CI、電碼資料比對、字型比對、GitHub Pages 部署
 test/                 node --test 測試
 licenses/             第三方授權全文
 ```
@@ -279,13 +316,13 @@ licenses/             第三方授權全文
 ### 供應鏈安全
 
 - 執行期零依賴：網站只有自己的程式碼、字型與資料。
-- 開發依賴只有 `typescript`、`@types/node` 與五個字型套件，全部釘選確切版本並提交 `pnpm-lock.yaml`。
+- 開發依賴只有 `typescript`、`@types/node`、五個字型套件，以及產生字型用的 `harfbuzzjs`（子集化）與 `woff2-encoder`（WOFF2 壓縮），全部釘選確切版本並提交 `pnpm-lock.yaml`。
 - `pnpm-workspace.yaml` 設定 `minimumReleaseAge: 10080`（新版本發布滿 7 天才會被安裝）、
   `trustPolicy: no-downgrade`，並禁止任何依賴執行安裝腳本。
 - CI 只有讀取權限、不使用任何機密；每個 GitHub Action 都以完整 commit SHA 釘選。
   GitHub Pages 部署的建置也只有讀取權限，只有最後的部署步驟有 `pages: write` 與 `id-token: write`。
 - Dependabot 每週檢查 npm 與 GitHub Actions，並設定 7 天冷卻期。
-- 不使用 Python；建置、資料處理與測試都只用 Node.js 與 TypeScript。
+- 不使用 Python；建置、資料處理、字型處理與測試都只用 Node.js 與 TypeScript（字型子集化與 WOFF2 壓縮是在 Node 裡執行的 WASM）。
 
 ## 授權
 

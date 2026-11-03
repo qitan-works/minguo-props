@@ -1,4 +1,6 @@
 // 建置：編譯 TypeScript，並把 HTML、CSS、電碼資料、字型與授權檔複製到 dist/。
+// 字型有兩種來源：Fontsource 套件（node_modules）與 pnpm fonts:generate 產生、提交在 fonts/ 的字型。
+// 兩種都會驗證實際複製的字型檔的數量與 SHA-256（登記在 src/fonts.ts），不符就中止建置。
 // 產出的 dist/ 是純靜態網站，放到任何靜態伺服器即可使用。
 
 import { spawnSync } from 'node:child_process';
@@ -8,8 +10,10 @@ import { fileURLToPath } from 'node:url';
 
 import { createHash } from 'node:crypto';
 
-import { FONTS } from '../src/fonts.ts';
-import { rewriteFontCss } from './lib/fonts.ts';
+import { FONTS, type FontsourceFont, type GeneratedFont } from '../src/fonts.ts';
+import { readManifest, type FontManifest, type ManifestFont } from './lib/font-manifest.ts';
+import { MODIFIED_DATE, PROJECT_URL } from './lib/font-sources.ts';
+import { generatedFontCss, rewriteFontCss } from './lib/fonts.ts';
 import { findRootUrls, kindOf } from './lib/relative-urls.ts';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
@@ -27,27 +31,92 @@ async function copyInto(from: string, to: string): Promise<void> {
   await copyFile(from, to);
 }
 
+/** 依檔名排序後串接的 SHA-256（與 src/fonts.ts 登記的算法相同）。 */
+async function concatSha256(dir: string, files: readonly string[]): Promise<string> {
+  const hash = createHash('sha256');
+  for (const file of [...files].sort()) hash.update(await readFile(path.join(dir, file)));
+  return hash.digest('hex');
+}
+
+async function buildFontsourceFont(font: FontsourceFont): Promise<string[]> {
+  const pkgDir = path.join(root, 'node_modules', font.pkg);
+  const pkgJson = JSON.parse(await readFile(path.join(pkgDir, 'package.json'), 'utf8')) as { version?: string };
+  if (pkgJson.version !== font.version) throw new Error(`${font.pkg} 版本為 ${pkgJson.version}，預期 ${font.version}`);
+  const css = await readFile(path.join(pkgDir, font.css), 'utf8');
+  const { css: rewritten, files } = rewriteFontCss(css, font.dir);
+  if (files.length !== font.fileCount) throw new Error(`${font.pkg} 有 ${files.length} 個 woff2，預期 ${font.fileCount}`);
+  // 驗證實際要提供的字型檔與登記的 SHA-256 相符
+  const digest = await concatSha256(path.join(pkgDir, 'files'), files);
+  if (digest !== font.sha256) throw new Error(`${font.pkg} 的字型檔 SHA-256 不符：${digest}`);
+  for (const file of files) {
+    await copyInto(path.join(pkgDir, 'files', file), path.join(dist, 'fonts', font.dir, file));
+  }
+  await copyInto(path.join(pkgDir, 'LICENSE'), path.join(dist, 'fonts', font.dir, 'LICENSE.txt'));
+  return [`/* ${font.pkg}@${font.version}（${files.length} 個 woff2 分片，SHA-256 ${font.sha256}；SIL OFL 1.1） */`, rewritten.trim()];
+}
+
+/** 放在字型目錄裡的來源與修改說明（GPL-2.0 第 2 條 (a) 款要求修改過的檔案註明修改內容與日期）。 */
+function sourceNotice(font: GeneratedFont, entry: ManifestFont): string {
+  const origin = entry.source.member ? `${path.basename(entry.source.member)}（在 ${entry.source.url} 裡）` : entry.source.url;
+  const lines = [
+    `${font.label}（CSS 字型家族名稱：${font.family}）`,
+    '',
+    `原始字型：${origin}`,
+    `原始檔 SHA-256：${entry.source.sha256}（${entry.source.bytes} 位元組）`,
+    ...(entry.source.member ? [`原始字型檔 SHA-256：${entry.source.fontSha256}（${entry.source.fontBytes} 位元組）`] : []),
+    `上游專案：${font.upstream}${font.commit ? `（commit ${font.commit}）` : ''}`,
+    `版本：${font.version}`,
+    `著作權：${font.copyright}`,
+    `授權：${font.license}（全文見同目錄的 LICENSE.txt；彙整見 ../../licenses/THIRD_PARTY_NOTICES.txt）`,
+    '',
+  ];
+  if (font.modified) {
+    lines.push(
+      `修改：民國道具舖（${PROJECT_URL}）於 ${MODIFIED_DATE} 修改了這套字型：切出子集（Big5 常用字、標點符號與網站用到的字），`,
+      `依 Unicode 範圍分成 ${entry.files.length} 個 WOFF2 檔，並在字型 name 表的說明欄（nameID 10）加註修改聲明。`,
+      '原有的著作權與授權聲明全部保留。字型檔本身就是可修改的原始形式；未修改的原始字型可從上面的網址取得。',
+      '',
+      `Modified by minguo-props (${PROJECT_URL}) on ${MODIFIED_DATE}: subset to Big5 level-1 characters, punctuation,`,
+      `symbols and the characters used by the site, split into ${entry.files.length} WOFF2 files by Unicode range, and a modification`,
+      'notice was appended to the description (name ID 10). All copyright and license notices are retained.',
+    );
+  } else {
+    lines.push(
+      '未修改：原字型的資料原封不動（每個表都與原檔逐位元組相同），只以 WOFF 1.0 壓縮，沒有 WOFF 中繼資料。',
+      'Unmodified: the original font data is unchanged; it is only WOFF 1.0 compressed, without WOFF metadata.',
+    );
+  }
+  return `${lines.join('\n')}\n`;
+}
+
+async function buildGeneratedFont(font: GeneratedFont, manifest: FontManifest): Promise<string[]> {
+  const entry = manifest.fonts.find((f) => f.id === font.id);
+  if (!entry) throw new Error(`fonts/manifest.json 沒有 ${font.id}，請執行 pnpm fonts:generate`);
+  if (entry.format !== font.format) throw new Error(`${font.id} 的格式為 ${entry.format}，預期 ${font.format}`);
+  const files = entry.files.map((f) => f.file);
+  if (files.length !== font.fileCount) throw new Error(`${font.id} 有 ${files.length} 個字型檔，預期 ${font.fileCount}`);
+  const srcDir = path.join(root, 'fonts', entry.id);
+  const digest = await concatSha256(srcDir, files);
+  if (digest !== font.sha256) throw new Error(`${font.id} 的字型檔 SHA-256 不符：${digest}`);
+  for (const file of files) await copyInto(path.join(srcDir, file), path.join(dist, 'fonts', font.dir, file));
+  const [license, ...more] = font.licenseFiles;
+  if (!license || more.length > 0) throw new Error(`${font.id} 應該只有一個授權檔`);
+  await copyInto(path.join(root, 'licenses', license), path.join(dist, 'fonts', font.dir, 'LICENSE.txt'));
+  await writeFile(path.join(dist, 'fonts', font.dir, 'SOURCE.txt'), sourceNotice(font, entry), 'utf8');
+  const what = font.modified ? `子集，${files.length} 個 ${font.format} 分片` : `原封不動的 ${font.format}`;
+  return [
+    `/* ${font.label}（${what}，SHA-256 ${font.sha256}；${font.license}，來源與修改說明見 ./${font.dir}/SOURCE.txt） */`,
+    generatedFontCss(font.family, font.dir, font.format, entry.files),
+  ];
+}
+
 async function buildFonts(): Promise<void> {
+  const manifest = await readManifest(path.join(root, 'fonts'));
   const parts: string[] = [
-    '/* 由 scripts/build.ts 從 Fontsource 套件產生。字型以 SIL Open Font License 1.1 授權，見 ../licenses/。 */',
+    '/* 由 scripts/build.ts 產生。字型各依其授權條款散布（SIL OFL 1.1 或 GPL-2.0-or-later），見 ../licenses/ 與各字型目錄的 LICENSE.txt。 */',
   ];
   for (const font of FONTS) {
-    const pkgDir = path.join(root, 'node_modules', font.pkg);
-    const pkgJson = JSON.parse(await readFile(path.join(pkgDir, 'package.json'), 'utf8')) as { version?: string };
-    if (pkgJson.version !== font.version) throw new Error(`${font.pkg} 版本為 ${pkgJson.version}，預期 ${font.version}`);
-    const css = await readFile(path.join(pkgDir, font.css), 'utf8');
-    const { css: rewritten, files } = rewriteFontCss(css, font.dir);
-    if (files.length !== font.woff2Count) throw new Error(`${font.pkg} 有 ${files.length} 個 woff2，預期 ${font.woff2Count}`);
-    // 驗證實際要提供的字型檔與登記的 SHA-256 相符
-    const hash = createHash('sha256');
-    for (const file of [...files].sort()) hash.update(await readFile(path.join(pkgDir, 'files', file)));
-    const digest = hash.digest('hex');
-    if (digest !== font.sha256) throw new Error(`${font.pkg} 的字型檔 SHA-256 不符：${digest}`);
-    for (const file of files) {
-      await copyInto(path.join(pkgDir, 'files', file), path.join(dist, 'fonts', font.dir, file));
-    }
-    await copyInto(path.join(pkgDir, 'LICENSE'), path.join(dist, 'fonts', font.dir, 'LICENSE.txt'));
-    parts.push(`/* ${font.pkg}@${font.version}（${files.length} 個 woff2 分片，SHA-256 ${font.sha256}） */`, rewritten.trim());
+    parts.push(...(font.source === 'fontsource' ? await buildFontsourceFont(font) : await buildGeneratedFont(font, manifest)));
   }
   await writeFile(path.join(dist, 'fonts', 'fonts.css'), `${parts.join('\n\n')}\n`, 'utf8');
 }

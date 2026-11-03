@@ -1,0 +1,73 @@
+# 字型驗證：從釘選的網址重新下載字型原始檔（王漢宗自由字型 tarball、清松手寫體、辰宇落雁體），
+# 驗證 SHA-256，重新切子集、分片、壓縮，確認與已提交的 fonts/ 逐位元組一致（pnpm fonts:check）。
+# 只在字型腳本、產出或字型清單變動時執行（也可手動執行）。不使用任何機密；每個 action 都以完整 commit SHA 釘選。
+name: 字型驗證
+
+on:
+  pull_request:
+    paths:
+      - scripts/fonts-generate.ts
+      - scripts/lib/font-*.ts
+      - scripts/lib/hb-subset.ts
+      - scripts/lib/sfnt.ts
+      - scripts/lib/tar.ts
+      - scripts/lib/text-chars.ts
+      - scripts/lib/woff.ts
+      - scripts/lib/woff2.ts
+      - fonts/**
+      - src/fonts.ts
+      - src/data/big5-level1.json
+      - package.json
+      - pnpm-lock.yaml
+      - .github/workflows/fonts.yml
+  push:
+    branches: [main]
+    paths:
+      - scripts/fonts-generate.ts
+      - scripts/lib/font-*.ts
+      - scripts/lib/hb-subset.ts
+      - scripts/lib/sfnt.ts
+      - scripts/lib/tar.ts
+      - scripts/lib/text-chars.ts
+      - scripts/lib/woff.ts
+      - scripts/lib/woff2.ts
+      - fonts/**
+      - src/fonts.ts
+      - src/data/big5-level1.json
+      - package.json
+      - pnpm-lock.yaml
+      - .github/workflows/fonts.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fonts-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: 重新產生字型並比對
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: 取得原始碼
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: 安裝 Node.js 24
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+
+      - name: 安裝 pnpm（版本取自 package.json 的 packageManager）
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      - name: 安裝依賴（harfbuzzjs、woff2-encoder）
+        run: pnpm install --frozen-lockfile
+
+      - name: 下載、驗證、重新產生並比對
+        run: pnpm fonts:check

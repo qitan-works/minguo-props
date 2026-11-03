@@ -3,7 +3,7 @@
 // 量出保護區與必毀區的位置之後，才由 src/render/effects.ts 畫上去（見 applyPaperEffects）。
 // 全部用 CSS、SVG 與 canvas 即時產生，不使用任何圖片素材。
 
-import { fontStack } from '../fonts.ts';
+import { fontStack, fontVertical } from '../fonts.ts';
 import type { Polygon } from '../lib/geometry.ts';
 import { mulberry32 } from '../lib/random.ts';
 import { PAPER_SIZES, type FontChoice, type PaperKey } from '../props/common.ts';
@@ -54,6 +54,9 @@ export function createPaperSurface(options: PaperSurfaceOptions): { paper: HTMLD
     content.style.setProperty('--f-ad', fontStack(options.fonts.ad, 'title'));
     content.style.setProperty('--f-body', fontStack(options.fonts.body, 'body'));
     content.style.setProperty('--f-hand', fontStack(options.fonts.hand, 'hand'));
+    // 有些手寫字型（清松 7、8）直排時上字的長筆畫會碰到下字：加大字距
+    const v = fontVertical(options.fonts.hand);
+    if (v.letterSpacing) content.style.setProperty('--hand-ls', `${v.letterSpacing}em`);
   }
   const paper = h(
     'div',

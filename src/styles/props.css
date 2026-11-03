@@ -164,6 +164,12 @@
   font-family: var(--f-hand);
 }
 
+/* 依手寫字型加大直排字距（沒設定時沿用原本的字距） */
+.vt.hand:not(.lt-text),
+.hand .vt {
+  letter-spacing: var(--hand-ls);
+}
+
 /* 標題用「標題字型」 */
 .np-title,
 .np-mh-title,
@@ -1035,7 +1041,7 @@
   color: var(--ink-color);
   font-size: var(--lt-font);
   line-height: var(--pitch);
-  letter-spacing: 0.05em;
+  letter-spacing: calc(0.05em + var(--hand-ls, 0em));
 }
 
 .lt-text p {

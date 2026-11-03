@@ -10,6 +10,7 @@ on:
       - scripts/lib/unihan.ts
       - scripts/lib/zip.ts
       - src/data/telegraph.json
+      - src/data/big5-level1.json
       - .github/workflows/unihan-data.yml
   workflow_dispatch:
 

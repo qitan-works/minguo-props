@@ -1,0 +1,80 @@
+# 部署到 GitHub Pages（https://qitan-works.github.io/minguo-props/）。
+# 只在推送 main（也就是 PR 合併後）與手動觸發時執行：先跑和 CI 相同的安裝、型別檢查、測試、建置，
+# 全部通過才把 dist/ 部署出去。不使用任何機密；每個 action 都以完整 commit SHA 釘選，註解標示對應版本。
+name: 部署到 GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# 預設不給任何權限，各 job 只拿自己需要的。
+permissions: {}
+
+# 同一時間只跑一個部署；正在進行的部署不取消，免得網站停在一半的狀態。
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: 型別檢查、測試與建置
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: 取得原始碼
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: 安裝 Node.js 24
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+
+      - name: 安裝 pnpm（版本取自 package.json 的 packageManager）
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      - name: 安裝依賴
+        run: pnpm install --frozen-lockfile
+
+      - name: 型別檢查
+        run: pnpm typecheck
+
+      - name: 測試
+        run: pnpm test
+
+      # 建置時也會檢查 dist/ 裡沒有以「/」開頭的網址（網站在子路徑下）
+      - name: 建置
+        run: pnpm build
+
+      # 只上傳 dist/（打包成名為 github-pages 的 artifact，不需要 GITHUB_TOKEN 權限）
+      - name: 上傳網站檔案
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: dist/
+
+  deploy:
+    name: 部署
+    needs: build
+    # 手動觸發時也只部署 main
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      # 確認 Pages 已啟用、來源為 GitHub Actions（要讀 Pages 設定，所以放在有 pages 權限的這個 job）
+      - name: 檢查 Pages 設定
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+
+      - name: 部署到 GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

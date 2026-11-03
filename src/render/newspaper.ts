@@ -3,7 +3,10 @@
 import { formatMinguoDate, parseIsoDate } from '../lib/minguo.ts';
 import { PAPER_SIZES, isPaperKey } from '../props/common.ts';
 import type { NewspaperData } from '../props/newspaper.ts';
+import type { Polygon } from '../lib/geometry.ts';
+import { pickConditions } from '../props/conditions.ts';
 import { h, paragraphs } from '../ui/dom.ts';
+import { fillMarked } from '../ui/marked.ts';
 import { createPaperSurface, createSheet } from './sheet.ts';
 
 /** 民國時期橫寫多由右而左。以 bidi-override 呈現，文字的邏輯順序不變。 */
@@ -11,7 +14,7 @@ function rtl(text: string, className: string): HTMLElement {
   return h('div', { class: ['rtl-line', className], text });
 }
 
-export function renderNewspaper(data: NewspaperData): HTMLElement {
+export function renderNewspaper(data: NewspaperData, crop: Polygon | null = null): HTMLElement {
   const paperKey = isPaperKey(data.paper) ? data.paper : 'a4-portrait';
   const size = PAPER_SIZES[paperKey];
   // A5（約 3.1 萬平方公釐）用較小的字級與留白；A4 約 6.2 萬。
@@ -24,13 +27,10 @@ export function renderNewspaper(data: NewspaperData): HTMLElement {
   const { paper, content } = createPaperSurface({
     width,
     height,
-    aging: data.aging,
-    folds: data.folds,
-    stains: data.stains,
-    stainSeed: data.stainSeed,
-    foldLines: { horizontal: [0.5], vertical: [0.5] },
+    conditions: pickConditions(data),
+    fonts: { title: data.fontTitle, body: data.fontBody, hand: data.fontHand },
     roughEdge: data.clipEdge,
-    seedOffset: 11,
+    crop,
     className: 'np-paper',
   });
   sheet.appendChild(paper);
@@ -103,13 +103,13 @@ export function renderNewspaper(data: NewspaperData): HTMLElement {
   paragraphs(data.body).forEach((text, i) => {
     const p = h('p', { class: 'np-p' });
     if (i === 0 && data.dateline) p.appendChild(h('span', { class: 'np-dateline', text: `【${data.dateline}】` }));
-    p.appendChild(document.createTextNode(text));
+    fillMarked(p, text);
     columns.appendChild(p);
   });
   if (data.secondTitle || data.secondBody) {
     const second = h('section', { class: 'np-second' });
     if (data.secondTitle) second.appendChild(h('h3', { class: 'np-second-title', text: data.secondTitle }));
-    for (const text of paragraphs(data.secondBody)) second.appendChild(h('p', { class: 'np-p', text }));
+    for (const text of paragraphs(data.secondBody)) second.appendChild(fillMarked(h('p', { class: 'np-p' }), text));
     columns.appendChild(second);
   }
   area.appendChild(columns);

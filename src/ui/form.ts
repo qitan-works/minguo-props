@@ -1,11 +1,12 @@
 // 依欄位定義產生表單。
 
 import { formatMinguoDate, parseIsoDate } from '../lib/minguo.ts';
-import type { Field } from '../props/schema.ts';
+import { freshSeed } from '../lib/random.ts';
+import type { Field, FieldValue } from '../props/schema.ts';
 import { h } from './dom.ts';
 import { readImageAsDataUrl } from './image.ts';
 
-export type FieldValue = string | boolean;
+export type { FieldValue };
 export type Values = Readonly<Record<string, FieldValue>>;
 
 export interface FormCallbacks {
@@ -100,6 +101,35 @@ export function buildForm(
           callbacks.onChange(field.key, input.value);
         });
         row.append(h('label', { attrs: { for: id }, text: field.label }), input, preview);
+        break;
+      }
+      case 'range': {
+        const input = h('input', {
+          attrs: { id, type: 'range', min: field.min, max: field.max, step: field.step, 'aria-describedby': describedBy },
+        });
+        const num = typeof value === 'number' ? value : field.min;
+        input.value = String(num);
+        const out = h('output', { class: 'range-value', attrs: { for: id }, text: `${num}${field.unit ?? ''}` });
+        input.addEventListener('input', () => {
+          const v = Number(input.value);
+          out.textContent = `${v}${field.unit ?? ''}`;
+          callbacks.onChange(field.key, v);
+        });
+        row.append(h('label', { attrs: { for: id }, text: field.label }), h('div', { class: 'range-box' }, input, out));
+        break;
+      }
+      case 'seed': {
+        const button = h('button', { class: 'btn btn-small', attrs: { id, type: 'button', 'aria-describedby': describedBy }, text: field.button });
+        const labelId = `${id}-label`;
+        button.setAttribute('aria-labelledby', `${labelId} ${id}`);
+        let current = typeof value === 'number' ? value : 1;
+        const shown = h('span', { class: 'seed-value', text: `種子 ${current}` });
+        button.addEventListener('click', () => {
+          current = freshSeed(current);
+          shown.textContent = `種子 ${current}`;
+          callbacks.onChange(field.key, current);
+        });
+        row.append(h('span', { class: 'field-label', attrs: { id: labelId }, text: field.label }), h('div', { class: 'seed-box' }, button, shown));
         break;
       }
       case 'image': {

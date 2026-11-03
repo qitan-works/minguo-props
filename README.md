@@ -6,15 +6,29 @@
 
 純前端靜態網頁：沒有後端、不需要帳號、不收集任何資料。
 
-| 報紙剪報 | 電報 | 信箋 | 名片／請帖 |
-| --- | --- | --- | --- |
-| ![報紙剪報範例](docs/samples/newspaper.jpg) | ![電報範例](docs/samples/telegram.jpg) | ![信箋範例](docs/samples/letter.jpg) | ![名片範例](docs/samples/card.jpg) ![請帖範例](docs/samples/invitation.jpg) |
+**線上版：<https://qitan-works.github.io/minguo-props/>**（GitHub Pages；`main` 每次更新後自動建置、測試並部署）
+
+| 整版報紙 | 從整版剪下 | 電報 | 信箋 | 名片／請帖 |
+| --- | --- | --- | --- | --- |
+| ![整版報紙](docs/samples/newspaper-full.jpg) | ![剪報](docs/samples/cut-torn.jpg) | ![電報](docs/samples/telegram.jpg) | ![信箋](docs/samples/letter.jpg) | ![名片](docs/samples/card.jpg) ![請帖](docs/samples/invitation.jpg) |
+
+| 火場搶出的信 | 泡過海水的日記 | 死者口袋裡揉爛的電報 | 地窖發霉的契據 | 被撕掉一半的筆記 | 塵封圖書館的剪報 |
+| --- | --- | --- | --- | --- | --- |
+| ![](docs/samples/preset-fire-letter.jpg) | ![](docs/samples/preset-sea-diary.jpg) | ![](docs/samples/preset-pocket-telegram.jpg) | ![](docs/samples/preset-cellar-deed.jpg) | ![](docs/samples/preset-torn-notes.jpg) | ![](docs/samples/preset-library-clipping.jpg) |
+
+更多範例（每種效果各一張）在 [`docs/samples/`](docs/samples/)。
 
 ## 道具種類
 
-1. **報紙剪報**：直排內文、由上而下分段並加欄線；虛構報頭（或內頁的報眉）、民國紀年與星期、號數與售價；
-   標題、副題、電頭與內文，可加一則短訊與一張照片（照片轉成灰階網點質感，文字繞排）。
-   可選「貼合內容」，讓剪報像真的從報上剪下來的一則新聞，並加上剪刀剪過的毛邊。
+1. **報紙**，有四種版面模式：
+   - **整版**：你的新聞放在右上角（跨兩段），其餘用內建的填版素材（本埠短訊、藥品／百貨／戲院廣告、輪船班期、物價、
+     天氣、尋人、遺失聲明、招領、婚喪啟事、警局與法院消息等，全部原創、虛構，模仿民國文體）由右而左補滿，整版沒有空白；
+     字太多時最後一則會截斷並加「（未完）」。可以加入多則自己的新聞或啟事，把線索藏在其中；按「換一批」重抽填版素材；
+     在預覽上點一則素材可以鎖定（換一批時保留）或刪除。
+   - **從整版剪下**：先排滿整版，再沿剪線剪出你的新聞（或全部自己的新聞、可連報頭）。剪線可選剪刀直剪（略歪、細微鋸齒）、
+     手撕、剪歪，四邊各多留多少可調。壓在剪線上的字會真的被切成一半，鄰近新聞的標題殘字與欄線斷頭照樣保留。
+   - **剪報（只有這一則）**：第一版的模式，可緊貼文字或填滿紙張。
+   直排內文、分段欄線、虛構報頭（或內頁的報眉）、民國紀年與星期、號數與售價、照片（灰階網點質感）。
 2. **電報**：電報局的收報紙或發報紙格式。正文逐字放進方格，每個字旁邊標上四碼中文電碼；
    查不到電碼的字會以紅框標示，並在介面列出。落款可用「韻目代日」（例如二十一日＝「馬」），
    也可加上地支代月（五月＝「辰」）。方格內容可選「只有電碼」，讓玩家自己查電碼本譯電。
@@ -26,7 +40,24 @@
 共通功能：
 
 - 左邊表單、右邊即時預覽；超出版面時會提醒。
-- 紙張做舊：泛黃、紙紋、摺痕、水漬與杯底圓環、印泥質感，全部以 CSS 與 SVG／canvas 即時產生，沒有使用任何圖片素材。
+- **紙張狀況**（四種道具都能用）：紙邊（剪刀剪、手撕露出白色紙纖維、火燒焦黑邊與燒穿的洞、老鼠咬、被撕掉一半）、
+  浸水（一角／一半／整張，墨水暈開、潮線）、摺痕（對摺／四摺／三摺，交叉處磨白）、揉皺後攤平、黃褐斑點、霉斑、日曬褪色、
+  蟲蛀、圖釘孔、生鏽迴紋針的鏽痕、發黃膠帶、濕手抹糊的墨跡、蠟燭滴蠟、鉛筆擦掉後殘留的字、墨水漸淡。
+  有六個**情境預設**（火場搶出的信、泡過海水的日記、死者口袋裡揉爛的電報、地窖發霉的契據、被撕掉一半的筆記、塵封圖書館的剪報），選了再微調。
+- **自由裁切**：在預覽上畫多邊形或手繪套索，框出要保留的部分；紙邊樣式會沿你畫的形狀加工。
+  列印時可加印淡色的「沿此剪下」裁切線，照著剪就能剪出手撕、火燒的形狀。
+- **文字層標記**（寫在信件、報紙、電報的正文裡）：
+  `[保:文字]` 線索（保護區，所有隨機效果都會避開）、`[毀:文字]` 必毀區（開了火燒邊或燒洞時燒出一個破洞，否則用濃墨整塊塗掉；碰到保護區時會自動縮小）、
+  `[黑:文字]` 塗黑、`[刪:文字]` 刪除線、`[改:舊|新]` 劃掉重寫、`[斷:文字]` 字寫到一半中斷。
+  保護區與必毀區在預覽上以虛線框標示，列印時不會印出。
+- **裝飾**：血跡（噴濺、滴落、拖痕、手印）、咖啡杯印、墨漬、指紋、火漆封印、紅筆圈注與箭頭、鉛筆劃線與眉批、
+  公文戳記（機密、作廢、已閱，文字可自訂）、抓痕、怪異黏液、怪符號（程式隨機組合的原創圖形）、反覆描寫到穿紙的字。
+  在預覽上拖曳移動，滑鼠滾輪縮放、Shift＋滾輪旋轉；表單可調旋轉、縮放、透明度與疊放順序。
+- **瘋狂感的手寫**（信箋）：「越寫越亂」——從第幾個字開始，每個字隨機偏移、旋轉、縮放、筆壓深淺，強度可調；
+  可夾雜塗改後重寫、同一句重複、字擠出邊界。
+- **字型**：每個道具的標題、內文、手寫部分可分別選字型（見下方字型表）。
+- **所有隨機效果都由固定的種子決定**，種子存進 JSON，按「換一個」重抽；預覽與列印完全一致。
+- 全部效果以 CSS、SVG 與程式產生，沒有使用任何圖片素材。
 - 民國紀年自動換算（1912 年＝民國元年）、中文數字（含「廿」「卅」寫法）、星期。
 - 內容自動存在瀏覽器的 localStorage；無痕模式等無法儲存的情況下照常運作，只是關閉後不保留。
 - 可匯出／匯入 JSON 存檔（照片也包含在檔案裡），方便備份或在不同電腦間搬移。
@@ -35,8 +66,10 @@
 
 ## 怎麼用
 
-把建置好的 `dist/` 放到任何靜態網站伺服器（GitHub Pages、Netlify、自己的主機都可以），用瀏覽器開啟即可。
-也可以在本機執行（見下方「本機開發」）。
+直接開啟線上版 <https://qitan-works.github.io/minguo-props/> 即可。
+
+也可以把建置好的 `dist/` 放到任何靜態網站伺服器（Netlify、自己的主機都可以），或在本機執行（見下方「本機開發」）。
+所有資源都用相對路徑，放在網站的子路徑下（例如 `/minguo-props/`）也能正常運作。
 
 > 因為使用 ES 模組並以 `fetch` 讀取電碼表，請透過網址（`http://` 或 `https://`）開啟，
 > 直接雙擊 `dist/index.html`（`file://`）大多數瀏覽器會擋下。
@@ -56,6 +89,25 @@
 - 以 Chromium 系瀏覽器（Chrome、Edge）測試最完整；Firefox 與 Safari 對自訂紙張大小的支援程度不同，
   若紙張大小不對，請在列印對話框手動選擇對應的紙張。
 - 一般家用印表機無法印到紙張最邊緣，滿版的信箋與電報四周可能留下幾公釐白邊，屬正常現象。
+- 手撕、火燒、自由裁切的道具：勾選「列印淡色的『沿此剪下』裁切線」，印好後沿虛線剪（或沿線手撕）。
+
+### 實體做舊的小技巧
+
+印出來之後再動手做舊，效果會更真：
+
+- **茶水或咖啡染色**：泡一杯濃紅茶（或即溶咖啡），放涼後用海綿或刷子塗滿紙張，邊緣多塗幾次；趁濕揉皺再攤平，
+  放在烤盤上以低溫（約 90～100°C）烘乾，或自然晾乾。雷射印表機的字不會暈開；噴墨印表機請先試印一張，必要時噴一層定型液。
+- **火燒邊**：在室外、旁邊準備一盆水，用打火機或蠟燭沿裁切線**一小段一小段**燒，燒到想要的位置立刻吹熄或按熄；
+  兒童請勿操作。也可以只用火源烤出焦黃而不燒穿。
+- **摺痕與磨損**：照畫面上的摺法摺好，用指甲或湯匙背壓實，再反覆摺幾次讓交叉處磨白。
+- **手撕**：沿列印的裁切線，一手壓住紙、另一手朝自己的方向慢慢撕，會留下白色的紙纖維。
+- **滴蠟、墨跡**：滴蠟請用白色或米色蠟燭；墨跡可用沾了水的手指抹開。
+
+### 效能與取捨
+
+大部分效果是向量（SVG 線條與漸層），預覽即時、PDF 檔小。只有「浸水」與「濕手抹糊的墨跡」用了模糊濾鏡
+（`backdrop-filter`，只作用在那一塊範圍），列印時瀏覽器會把那一塊轉成點陣圖，PDF 會大一些（數百 KB 到 1 MB 左右）。
+紙紋是一小塊程式產生的 canvas 圖案平鋪，而不是整頁的 SVG 雜訊濾鏡，避免 PDF 變成十幾 MB。
 
 ## 隱私
 
@@ -64,6 +116,10 @@
 - 你填寫的內容與照片只存在你自己的瀏覽器（localStorage）與你匯出的 JSON 檔裡，不會上傳。
 - 照片用 FileReader 讀進瀏覽器、以 canvas 縮小後重新編碼；這一步也會去掉相機寫入的 EXIF（例如拍攝地點）。
 - 「清除本機資料」按鈕會刪除這個網站存在你瀏覽器裡的全部內容。
+- 線上版由 GitHub Pages 託管：網站本身沒有任何分析或追蹤，但 GitHub 作為主機會依它自己的隱私權政策處理連線紀錄（例如 IP 位址）。
+  不想經過 GitHub 的話，可以下載原始碼在本機執行。
+- 瀏覽器的 localStorage 是以網域區分的：`qitan-works.github.io` 底下的其他專案頁面和本網站屬於同一個網域，
+  技術上讀得到這裡存的內容。請不要在道具裡放真正的個人資料；需要保存的內容建議匯出 JSON 自己保管。
 
 ## 資料與字型的來源和授權
 
@@ -86,11 +142,10 @@
 
 民國電報以平水韻的韻目字代表日期：1～15 日用上平聲十五韻（東冬江支微魚虞齊佳灰真文元寒刪），
 別用下平聲（先蕭肴豪歌麻陽庚青蒸尤侵覃鹽咸）；16 日起取上聲或去聲的第 N 韻
-（銑篠巧皓號馬養漾敬有寢感儉豔），30 日寫「卅」（亦作「陷」），31 日寫「世」或「引」；
+（銑篠巧皓哿馬養漾敬有寢感儉豔；20 日亦作「號」），30 日寫「卅」（亦作「陷」），31 日寫「世」或「引」；
 月份以地支代表（子＝一月……亥＝十二月）。對照表在 [`src/lib/yunmu.ts`](src/lib/yunmu.ts)，依據下列資料整理，並以史例交叉檢查：
 
 - 維基百科〈代日韻目〉（<https://zh.wikipedia.org/zh-tw/代日韻目>）及其討論頁；
-- 中央研究院近代史研究所檔案館〈電報代月代日〉（<https://archives.sinica.edu.tw/project/98>）；
 - 古文維基百科〈韻目代日〉（<https://zh-classical.wikipedia.org/wiki/韻目代日>）；
 - 維基文庫〈平水韻〉的韻目次序（<https://zh.wikisource.org/zh-hant/平水韻>）；
 - 以韻目命名的史事：馬日事變（1927 年 5 月 21 日）、文夕大火（1938 年 11 月 12 日夜）、豔電（1938 年 12 月 29 日）、
@@ -98,13 +153,27 @@
 
 ### 字型
 
-| 字型 | 授權 | 來源 |
-| --- | --- | --- |
-| Noto Serif TC（可變字重） | SIL Open Font License 1.1 | npm 套件 `@fontsource-variable/noto-serif-tc`；上游 notofonts/noto-cjk |
-| LXGW WenKai TC（霞鶩文楷 TC） | SIL Open Font License 1.1 | npm 套件 `@fontsource/lxgw-wenkai-tc`；上游 lxgw/LxgwWenkaiTC |
+每套都以 woff2 檔的 cmap 實際檢查字數：涵蓋教育部〈常用國字標準字體表〉4,808 字中的 4,807 字（唯一缺的「甽」是 Google Fonts 的切片沒有收，
+五套都缺，瀏覽器會改用系統字型顯示），也能顯示所有預設與填版文字。檢查用的 Big5 常用字表（`src/data/big5-level1.json`）由同一份 Unihan 資料產生。
+字型版本釘選在 `package.json`，建置時驗證每套字型 woff2 檔的 SHA-256（登記在 `src/fonts.ts`）。
 
-字型套件只在建置時讀取，`pnpm build` 會把依 Unicode 範圍切好的 woff2 分片複製到 `dist/fonts/`，
-瀏覽器只下載實際用到的分片。授權全文在 [`licenses/`](licenses/)，彙整見 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)。
+
+| 字型 | 風格 | 來源套件（版本） | 授權全文 |
+| --- | --- | --- | --- |
+| 思源宋體 Noto Serif TC（可變字重） | 印刷明體（預設標題與內文） | `@fontsource-variable/noto-serif-tc` 5.3.1 | [`licenses/OFL-Noto-Serif-TC.txt`](licenses/OFL-Noto-Serif-TC.txt) |
+| 仙人掌明體 Cactus Classical Serif | 鉛字風格的傳統明體，最有民國印刷味 | `@fontsource/cactus-classical-serif` 5.3.1 | [`licenses/OFL-Cactus-Classical-Serif.txt`](licenses/OFL-Cactus-Classical-Serif.txt) |
+| 霞鶩文楷 TC（LXGW WenKai TC） | 楷書（預設手寫） | `@fontsource/lxgw-wenkai-tc` 5.3.1 | [`licenses/OFL-LXGW-WenKai-TC.txt`](licenses/OFL-LXGW-WenKai-TC.txt) |
+| 芫荽 Iansui | 鋼筆手寫 | `@fontsource/iansui` 5.3.1 | [`licenses/OFL-Iansui.txt`](licenses/OFL-Iansui.txt) |
+| jf open 粉圓 Huninn | 現代圓體（不太像民國，但可選） | `@fontsource/huninn` 5.3.1 | [`licenses/OFL-Huninn.txt`](licenses/OFL-Huninn.txt) |
+
+字型套件只在建置時讀取，`pnpm build` 會把依 Unicode 範圍切好的 woff2 分片複製到 `dist/fonts/`。
+`@font-face` 搭配 `unicode-range`：只有選用的字型、而且只有用到的字所在的分片才會下載。
+
+查過但沒有收的字型：辰宇落雁體（授權保留字型名稱，自行切片屬修改版需改名，也沒有預先切好的發布）、
+清松手寫體（授權只寫「SIL Open Font License」未載明版本、沒有授權檔，也缺「卽」等字）、
+源樣明體（只有 16 MB 的 OTF 與第三方個人維護的切片套件；不用 Python 的情況下這一版未實作自行切片）、
+柳建毛草、志莽行書（只有簡體中文，缺「霧」「電」「報」「總」「聲」等繁體字）、
+Chiron Sung HK（Fontsource 套件裡是未壓縮的 TTF、全套 16.8 MB，且為香港字形）。授權全文在 [`licenses/`](licenses/)，彙整見 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)。
 
 ## 本機開發
 
@@ -123,18 +192,36 @@ pnpm build
 pnpm serve
 ```
 
-開啟 <http://127.0.0.1:4173/>。其他指令：
+開啟 <http://127.0.0.1:4173/>。想模擬 GitHub Pages 的子路徑時：
+
+```bash
+BASE=/minguo-props/ pnpm serve
+```
+
+開啟 <http://127.0.0.1:4173/minguo-props/>；這時根路徑一律 404，可以確認沒有資源用到根路徑。其他指令：
 
 | 指令 | 說明 |
 | --- | --- |
 | `pnpm typecheck` | TypeScript 型別檢查（strict） |
-| `pnpm test` | 以 Node 內建的 `node --test` 測試純邏輯：電碼查詢、民國紀年、中文數字、韻目代日、存檔格式、ZIP 解壓等 |
-| `pnpm build` | 編譯並輸出靜態網站到 `dist/` |
-| `pnpm serve` | 只綁定 127.0.0.1 的本機預覽伺服器（提供 `dist/`） |
-| `pnpm data:telegraph` | 從 unicode.org 下載 `Unihan.zip` 並重新產生 `src/data/telegraph.json` |
+| `pnpm test` | 以 Node 內建的 `node --test` 測試純邏輯：電碼查詢、民國紀年、中文數字、韻目代日、存檔格式、亂數種子、剪線與切片幾何、整版排版、保護區判斷、字型清單與授權一致性、字數檢查、ZIP 與 WOFF2 解析、網址都是相對路徑等 |
+| `pnpm build` | 編譯並輸出靜態網站到 `dist/`；產物裡只要有以「/」開頭的網址就中止 |
+| `pnpm serve` | 只綁定 127.0.0.1 的本機預覽伺服器（提供 `dist/`；`BASE` 環境變數可指定子路徑） |
+| `pnpm data:telegraph` | 從 unicode.org 下載 `Unihan.zip` 並重新產生 `src/data/telegraph.json` 與 `src/data/big5-level1.json` |
 | `pnpm data:check` | 重新產生並與已提交的電碼資料比對（不寫入） |
 
 `pnpm data:telegraph --zip 路徑/Unihan.zip` 可改用本機已下載的 `Unihan.zip`（一樣會驗證 SHA-256）。
+
+### 部署（GitHub Pages）
+
+`.github/workflows/pages.yml` 只在推送 `main`（PR 合併後）與手動觸發時執行，網址是 <https://qitan-works.github.io/minguo-props/>。
+
+1. **建置**（只有 `contents: read` 權限）：和 CI 相同的 `pnpm install --frozen-lockfile`、型別檢查、測試、建置，
+   全部通過才用 `actions/upload-pages-artifact` 把 `dist/` 打包上傳。
+2. **部署**（只有 `pages: write` 與 `id-token: write`，使用 `github-pages` 環境，只部署 `main`）：
+   `actions/configure-pages` 確認 Pages 的來源設為 GitHub Actions，再由 `actions/deploy-pages` 部署。
+
+工作流程預設不給任何權限，每個 job 只拿自己需要的；不使用任何機密，checkout 設 `persist-credentials: false`，
+每個 action 都以完整 commit SHA 釘選並註明版本。部署不加任何分析或追蹤，頁面的 Content-Security-Policy 與本機相同。
 
 ### 專案結構
 
@@ -143,13 +230,16 @@ src/
   index.html          頁面（含做舊用的 SVG 濾鏡）
   main.ts             主程式：表單、預覽、自動保存、匯出入
   state.ts            存檔格式（匯出／匯入、localStorage 共用）
-  lib/                純邏輯：民國紀年、中文數字、韻目代日、電碼查詢、localStorage 包裝
-  props/              四種道具的欄位定義與預設內容
-  render/             四種道具的版面與做舊效果
-  ui/                 表單產生器、照片處理
+  fonts.ts            可選字型清單（來源、版本、授權、SHA-256）
+  lib/                純邏輯：民國紀年、中文數字、韻目代日、電碼查詢、亂數、幾何、剪線、紙張狀況規劃、
+                      文字層標記、裝飾形狀、越寫越亂、整版排版（lib/newspaper/）
+  props/              四種道具的欄位定義、預設內容、紙張狀況與情境預設、存檔中的結構化資料
+  render/             四種道具的版面、紙張狀況、裝飾
+  ui/                 表單產生器、照片處理、新聞條目、裁切、裝飾編輯、預覽選單
   styles/             介面、道具與列印樣式
-  data/telegraph.json 電碼資料（由腳本產生）
+  data/               電碼資料、Big5 常用字表（由腳本產生）、填版素材
 scripts/              建置、本機伺服器、電碼資料產生腳本
+.github/workflows/    CI、電碼資料比對、GitHub Pages 部署
 test/                 node --test 測試
 licenses/             第三方授權全文
 ```
@@ -157,10 +247,11 @@ licenses/             第三方授權全文
 ### 供應鏈安全
 
 - 執行期零依賴：網站只有自己的程式碼、字型與資料。
-- 開發依賴只有 `typescript`、`@types/node` 與兩個字型套件，全部釘選確切版本並提交 `pnpm-lock.yaml`。
+- 開發依賴只有 `typescript`、`@types/node` 與五個字型套件，全部釘選確切版本並提交 `pnpm-lock.yaml`。
 - `pnpm-workspace.yaml` 設定 `minimumReleaseAge: 10080`（新版本發布滿 7 天才會被安裝）、
   `trustPolicy: no-downgrade`，並禁止任何依賴執行安裝腳本。
 - CI 只有讀取權限、不使用任何機密；每個 GitHub Action 都以完整 commit SHA 釘選。
+  GitHub Pages 部署的建置也只有讀取權限，只有最後的部署步驟有 `pages: write` 與 `id-token: write`。
 - Dependabot 每週檢查 npm 與 GitHub Actions，並設定 7 天冷卻期。
 - 不使用 Python；建置、資料處理與測試都只用 Node.js 與 TypeScript。
 

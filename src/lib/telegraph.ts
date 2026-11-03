@@ -5,6 +5,8 @@
 // 但個別字可能與當時的版本有出入。電碼本收的常是舊字形（例如「啓」「卽」「爲」），
 // 所以另有異體字代查表：查不到「啟」時改用「啓」的電碼，並標示出來。
 
+import { markedChars, type MarkKind } from './markup.ts';
+
 export interface LookupResult {
   readonly codes: readonly string[];
   /** 本字沒有電碼、改用異體字代查時，記下所用的字。 */
@@ -17,10 +19,14 @@ export interface Codebook {
   readonly size: number;
 }
 
-export type TelegramCell =
+export type TelegramCell = (
   | { readonly kind: 'han'; readonly char: string; readonly codes: readonly string[]; readonly via?: string }
   | { readonly kind: 'missing'; readonly char: string }
-  | { readonly kind: 'other'; readonly char: string };
+  | { readonly kind: 'other'; readonly char: string }
+) & {
+  /** 文字層標記（[保:…]、[毀:…] 等）。 */
+  readonly mark?: MarkKind;
+};
 
 const CODE_RE = /^\d{4}( \d{4})*$/;
 const HAN_RE = /^\p{Script=Han}$/u;
@@ -83,21 +89,24 @@ export function annotateTelegram(text: string, book: Codebook, options: Annotate
   const dropPunctuation = options.dropPunctuation ?? true;
   const cells: TelegramCell[] = [];
   // 去掉異體字選擇符（VS1–16、VS17–256），以免干擾查詢。
-  const cleaned = text.replace(/[︀-️]|\uDB40[\uDD00-\uDDEF]/g, '');
-  for (const char of cleaned) {
+  const cleaned = text.replace(/[\uFE00-\uFE0F]|\uDB40[\uDD00-\uDDEF]/g, '');
+  for (const { ch: char, mark } of markedChars(cleaned)) {
+    const push = (cell: TelegramCell): void => {
+      cells.push(mark ? { ...cell, mark } : cell);
+    };
     if (char === '\n' || char === '\r') continue;
     if (PUNCT_OR_SPACE_RE.test(char)) {
       if (dropPunctuation || /\s/.test(char)) continue;
-      cells.push({ kind: 'other', char });
+      push({ kind: 'other', char });
       continue;
     }
     if (isHan(char)) {
       const found = book.lookup(char);
-      if (!found) cells.push({ kind: 'missing', char });
-      else if (found.via !== undefined) cells.push({ kind: 'han', char, codes: found.codes, via: found.via });
-      else cells.push({ kind: 'han', char, codes: found.codes });
+      if (!found) push({ kind: 'missing', char });
+      else if (found.via !== undefined) push({ kind: 'han', char, codes: found.codes, via: found.via });
+      else push({ kind: 'han', char, codes: found.codes });
     } else {
-      cells.push({ kind: 'other', char });
+      push({ kind: 'other', char });
     }
   }
   return cells;

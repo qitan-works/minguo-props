@@ -6,6 +6,14 @@ import { createCodebook, encodeTelegram, missingChars, substitutedChars, type Co
 import { renderCard } from './render/card.ts';
 import { renderLetter } from './render/letter.ts';
 import { fitNewspaperToContent, renderNewspaper } from './render/newspaper.ts';
+import { renderNewspaperFull, type FullPageRender } from './render/newspaper-full.ts';
+import { applyPaperEffects } from './render/effects.ts';
+import { drawDecorations } from './render/decorations.ts';
+import { buildDecorationEditor } from './ui/decorations.ts';
+import { PX_PER_MM } from './lib/geometry.ts';
+import { applyPreset, pickConditions } from './props/conditions.ts';
+import { startCropDrawing, type CropSession, type CropTool } from './ui/crop.ts';
+import type { Decoration } from './props/extras.ts';
 import { findOverflow } from './render/sheet.ts';
 import { renderTelegram, type TelegramRender } from './render/telegram.ts';
 import {
@@ -15,12 +23,15 @@ import {
   defaultState,
   parseSaveText,
   serializeState,
+  updateExtras,
   updateProp,
   type AppState,
   type PropKind,
 } from './state.ts';
 import { h } from './ui/dom.ts';
 import { buildForm, type FieldValue } from './ui/form.ts';
+import { buildItemsEditor } from './ui/items.ts';
+import { closePopover, showPopover } from './ui/popover.ts';
 
 const STORAGE_KEY = 'minguo-props:v1';
 const store = createSafeStore(() => window.localStorage, STORAGE_KEY);
@@ -47,6 +58,8 @@ const els = {
 };
 
 let codebook: Codebook | null = null;
+let lastFull: FullPageRender | null = null;
+let selectedDeco: string | null = null;
 let codebookFailed = false;
 let saveTimer: number | undefined;
 let renderQueued = false;
@@ -127,13 +140,21 @@ function switchTo(kind: PropKind): void {
 let refreshForm: ((values: Readonly<Record<string, FieldValue>>) => void) | null = null;
 
 function currentValues(): Readonly<Record<string, FieldValue>> {
-  return state.props[state.active] as Readonly<Record<string, FieldValue>>;
+  return state.props[state.active] as unknown as Readonly<Record<string, FieldValue>>;
 }
 
 function rebuildForm(): void {
   const kind = state.active;
   const form = buildForm(PROP_FIELDS[kind], currentValues(), {
     onChange(key, value) {
+      if (key === 'preset') {
+        // 情境預設：一次套用一組紙張狀況，再重建表單讓欄位顯示新值
+        state = updateProp(state, kind, applyPreset(pickConditions(currentValues()), String(value)) as never);
+        queueRender();
+        scheduleSave();
+        rebuildForm();
+        return;
+      }
       state = updateProp(state, kind, { [key]: value } as never);
       refreshForm?.(currentValues());
       queueRender();
@@ -145,7 +166,87 @@ function rebuildForm(): void {
   });
   refreshForm = form.refresh;
   els.form.replaceChildren(form.root);
+  els.form.appendChild(cropEditor(kind));
+  els.form.appendChild(
+    buildDecorationEditor({
+      decorations: state.extras[kind].decorations,
+      selectedId: selectedDeco,
+      center: () => {
+        const paper = els.stage.querySelector<HTMLElement>('.paper');
+        return paper ? { x: paper.offsetWidth / PX_PER_MM / 2, y: paper.offsetHeight / PX_PER_MM / 2 } : { x: 50, y: 50 };
+      },
+      onChange(decorations, redraw) {
+        state = updateExtras(state, kind, { decorations } as never);
+        queueRender();
+        scheduleSave();
+        if (redraw) rebuildForm();
+      },
+      onSelect(id) {
+        if (id === selectedDeco) return;
+        selectedDeco = id;
+        queueRender();
+      },
+    }),
+  );
+  if (kind === 'newspaper') {
+    els.form.appendChild(
+      buildItemsEditor(state.extras.newspaper.items, (items) => {
+        state = updateExtras(state, 'newspaper', { items });
+        queueRender();
+        scheduleSave();
+      }),
+    );
+  }
   els.form.setAttribute('aria-labelledby', `tab-${kind}`);
+}
+
+// ---- 自由裁切 ----
+
+let cropSession: CropSession | null = null;
+
+function cropEditor(kind: PropKind): HTMLElement {
+  const has = state.extras[kind].crop !== null;
+  const status = h('p', { class: 'form-hint', text: has ? '已設定自由裁切範圍。' : '尚未設定（整張紙）。' });
+  const start = (tool: CropTool): void => {
+    cropSession?.cancel();
+    queueRender();
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        cropSession = startCropDrawing(
+          els.stage,
+          tool,
+          (points) => {
+            state = updateExtras(state, kind, { crop: points } as never);
+            scheduleSave();
+          },
+          () => {
+            cropSession = null;
+            rebuildForm();
+            queueRender();
+          },
+        );
+      }),
+    );
+  };
+  const polygon = h('button', { class: 'btn btn-small', attrs: { type: 'button' }, text: '在預覽上畫多邊形' });
+  const lasso = h('button', { class: 'btn btn-small', attrs: { type: 'button' }, text: '手繪套索' });
+  const clear = h('button', { class: 'btn btn-small', attrs: { type: 'button', disabled: !has }, text: '清除自由裁切' });
+  polygon.addEventListener('click', () => start('polygon'));
+  lasso.addEventListener('click', () => start('lasso'));
+  clear.addEventListener('click', () => {
+    state = updateExtras(state, kind, { crop: null } as never);
+    scheduleSave();
+    rebuildForm();
+    queueRender();
+  });
+  return h(
+    'fieldset',
+    { class: 'form-group' },
+    h('legend', { text: '自由裁切' }),
+    h('p', { class: 'form-hint', text: '框出要保留的部分；搭配「紙邊」選擇手撕、火燒等樣式，會沿著你畫的形狀加工。' }),
+    h('div', { class: 'crop-buttons' }, polygon, lasso, clear),
+    status,
+  );
 }
 
 // ---- 預覽 ----
@@ -198,21 +299,30 @@ function renderTelegramInfo(result: TelegramRender | null): void {
 }
 
 function renderPreview(): void {
+  closePopover();
+  lastFull = null;
   let sheet: HTMLElement;
   let telegram: TelegramRender | null = null;
   switch (state.active) {
-    case 'newspaper':
-      sheet = renderNewspaper(state.props.newspaper);
+    case 'newspaper': {
+      const np = state.props.newspaper;
+      if (np.fit === 'full' || np.fit === 'cut') {
+        lastFull = renderNewspaperFull(np, state.extras.newspaper);
+        sheet = lastFull.sheet;
+      } else {
+        sheet = renderNewspaper(np, state.extras.newspaper.crop);
+      }
       break;
+    }
     case 'telegram':
-      telegram = renderTelegram(state.props.telegram, codebook);
+      telegram = renderTelegram(state.props.telegram, codebook, state.extras.telegram.crop);
       sheet = telegram.sheet;
       break;
     case 'letter':
-      sheet = renderLetter(state.props.letter);
+      sheet = renderLetter(state.props.letter, state.extras.letter.crop);
       break;
     case 'card':
-      sheet = renderCard(state.props.card);
+      sheet = renderCard(state.props.card, state.extras.card.crop);
       break;
   }
   // 列印用的頁面名稱（見 print.css）
@@ -220,6 +330,8 @@ function renderPreview(): void {
   const scaler = h('div', { class: 'sheet-scaler' }, sheet);
   els.stage.replaceChildren(scaler);
   fitNewspaperToContent(sheet);
+  applyPaperEffects(sheet);
+  drawDecorations(sheet, state.extras[state.active].decorations, selectedDeco);
   fitPreview();
   renderTelegramInfo(telegram);
   requestAnimationFrame(() => {
@@ -295,7 +407,11 @@ els.resetButton.addEventListener('click', () => {
   const kind = state.active;
   if (!window.confirm(`要把「${PROP_LABELS[kind]}」的內容還原成預設值嗎？`)) return;
   const defaults = defaultState();
-  state = { ...state, props: { ...state.props, [kind]: defaults.props[kind] } };
+  state = {
+    ...state,
+    props: { ...state.props, [kind]: defaults.props[kind] },
+    extras: { ...state.extras, [kind]: defaults.extras[kind] },
+  };
   rebuildForm();
   queueRender();
   scheduleSave();
@@ -312,6 +428,125 @@ els.clearButton.addEventListener('click', () => {
   queueRender();
   setStatus('已清除本機保存的內容。');
 });
+
+// ---- 整版：點一則素材可鎖定或刪除 ----
+
+els.stage.addEventListener('click', (event) => {
+  if (event.target instanceof Element && event.target.closest('.deco, .crop-overlay')) return;
+  const target = event.target instanceof Element ? event.target.closest<HTMLElement>('.nb[data-block-id]') : null;
+  if (!target || !lastFull || state.active !== 'newspaper') {
+    closePopover();
+    return;
+  }
+  const id = target.dataset['blockId'] ?? '';
+  const source = target.dataset['source'];
+  const box = els.stage.getBoundingClientRect();
+  const x = event.clientX - box.left + els.stage.scrollLeft;
+  const y = event.clientY - box.top + els.stage.scrollTop;
+  const extras = state.extras.newspaper;
+  const commit = (patch: Parameters<typeof updateExtras<'newspaper'>>[2]): void => {
+    state = updateExtras(state, 'newspaper', patch);
+    queueRender();
+    scheduleSave();
+  };
+  if (source === 'filler') {
+    const baseId = id.split('#')[0] ?? id;
+    const isLocked = extras.locked.some((l) => l.id === baseId);
+    const item = lastFull.pool.byId.get(baseId);
+    showPopover(els.stage, x, y, '填版素材', [
+      isLocked
+        ? { label: '解除鎖定', run: () => commit({ locked: extras.locked.filter((l) => l.id !== baseId) }) }
+        : {
+            label: '鎖定（換一批時保留）',
+            run: () => {
+              if (item) commit({ locked: [...extras.locked, item].slice(-60) });
+              else setStatus('這一行小訊無法鎖定，可以改用「我的新聞與啟事」自己加。', 'warn');
+            },
+          },
+      {
+        label: '刪除這一塊',
+        run: () =>
+          commit({
+            locked: extras.locked.filter((l) => l.id !== baseId),
+            removed: [...extras.removed.filter((r) => r !== baseId), baseId].slice(-500),
+          }),
+      },
+    ]);
+  } else if (id === 'main' || id === 'photo' || id === 'second') {
+    showPopover(els.stage, x, y, '這一則在左邊表單的「新聞」「照片」「短訊」欄位編輯', []);
+  } else {
+    showPopover(els.stage, x, y, '我的新聞與啟事', [
+      {
+        label: '刪除這一則',
+        run: () => {
+          commit({ items: extras.items.filter((i) => i.id !== id) });
+          rebuildForm();
+        },
+      },
+    ]);
+  }
+});
+
+// ---- 裝飾：拖曳移動、滾輪縮放、Shift＋滾輪旋轉 ----
+
+function decoTarget(event: Event): { g: SVGGElement; id: string; paper: HTMLElement } | null {
+  const g = event.target instanceof Element ? event.target.closest<SVGGElement>('g.deco[data-deco-id]') : null;
+  const paper = g?.closest<HTMLElement>('.paper');
+  const id = g?.dataset['decoId'];
+  return g && paper && id ? { g, id, paper } : null;
+}
+
+function patchDecoration(id: string, patch: (d: Decoration) => Partial<Decoration>): void {
+  const kind = state.active;
+  const decorations = state.extras[kind].decorations.map((d) => (d.id === id ? { ...d, ...patch(d) } : d));
+  state = updateExtras(state, kind, { decorations } as never);
+  queueRender();
+  scheduleSave();
+}
+
+els.stage.addEventListener('pointerdown', (event) => {
+  const hit = decoTarget(event);
+  if (!hit) return;
+  event.preventDefault();
+  const deco = state.extras[state.active].decorations.find((d) => d.id === hit.id);
+  if (!deco) return;
+  if (selectedDeco !== hit.id) {
+    selectedDeco = hit.id;
+    rebuildForm();
+  }
+  const perMm = hit.paper.getBoundingClientRect().width / (hit.paper.offsetWidth / PX_PER_MM);
+  const startX = event.clientX;
+  const startY = event.clientY;
+  const base = hit.g.getAttribute('transform') ?? '';
+  let dx = 0;
+  let dy = 0;
+  const move = (e: PointerEvent): void => {
+    dx = (e.clientX - startX) / perMm;
+    dy = (e.clientY - startY) / perMm;
+    hit.g.setAttribute('transform', `translate(${dx.toFixed(2)} ${dy.toFixed(2)}) ${base}`);
+  };
+  const up = (): void => {
+    window.removeEventListener('pointermove', move);
+    window.removeEventListener('pointerup', up);
+    if (Math.abs(dx) + Math.abs(dy) > 0.05) patchDecoration(hit.id, (d) => ({ x: d.x + dx, y: d.y + dy }));
+    else queueRender();
+  };
+  window.addEventListener('pointermove', move);
+  window.addEventListener('pointerup', up);
+});
+
+els.stage.addEventListener(
+  'wheel',
+  (event) => {
+    const hit = decoTarget(event);
+    if (!hit) return;
+    event.preventDefault();
+    const dir = event.deltaY > 0 ? -1 : 1;
+    if (event.shiftKey) patchDecoration(hit.id, (d) => ({ rotate: Math.max(-180, Math.min(180, d.rotate + dir * 5)) }));
+    else patchDecoration(hit.id, (d) => ({ scale: Math.max(0.2, Math.min(4, d.scale * (dir > 0 ? 1.06 : 1 / 1.06))) }));
+  },
+  { passive: false },
+);
 
 // ---- 啟動 ----
 

@@ -20,6 +20,9 @@
   },
   "devDependencies": {
     "@fontsource-variable/noto-serif-tc": "5.3.1",
+    "@fontsource/cactus-classical-serif": "5.3.1",
+    "@fontsource/huninn": "5.3.1",
+    "@fontsource/iansui": "5.3.1",
     "@fontsource/lxgw-wenkai-tc": "5.3.1",
     "@types/node": "24.19.2",
     "typescript": "6.0.3"

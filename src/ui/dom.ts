@@ -24,7 +24,7 @@ function applyOptions(el: Element, options: ElementOptions): void {
       el.setAttribute(name, value === true ? '' : String(value));
     }
   }
-  if (options.dataset && el instanceof HTMLElement) {
+  if (options.dataset && (el instanceof HTMLElement || el instanceof SVGElement)) {
     for (const [name, value] of Object.entries(options.dataset)) el.dataset[name] = value;
   }
   if (options.style && (el instanceof HTMLElement || el instanceof SVGElement)) {

@@ -102,13 +102,17 @@ export interface EffectPlan {
   readonly holes: { readonly kind: 'burn' | 'worm' | 'pin'; readonly polygon: Point[] }[];
   /** 火燒的焦痕：紙邊（edge = burnt）與每個燒洞各一組，由外往內。 */
   readonly char: { readonly edge: CharMarks | null; readonly holes: CharMarks[] };
-  /** 浸水範圍（含避開保護區的洞，以 evenodd 規則填色）、乾掉後留下的潮線、起皺的紋路與墨色偏向。 */
+  /**
+   * 浸水範圍（含避開保護區的洞，以 evenodd 規則填色）、乾掉後留下的潮線、起皺的紋路與墨色偏向；
+   * soaked 是泡得最久的幾塊（互不重疊、不碰保護區），那裡的字暈得最開。
+   */
   readonly water: {
     readonly polygons: Point[][];
     readonly strength: number;
     readonly tides: Point[][];
     readonly wrinkles: Point[][];
     readonly tint: 'blue' | 'brown';
+    readonly soaked: Point[][];
   } | null;
   /** 濕手抹糊的墨跡。 */
   readonly smudges: Point[][];
@@ -619,12 +623,29 @@ export function planEffects(input: PlanInput): EffectPlan {
       if (polygonHitsAny(line, input.protect)) continue;
       wrinkles.push(line);
     }
+    // 泡得最久的幾塊：在水漬範圍內、不碰保護區、互不重疊（另用一個亂數，不影響潮線與紋路）
+    const soaked: Point[][] = [];
+    if (s.waterStrength >= 30) {
+      const srng = rngOf(`water-soak:${s.water}`);
+      const want = int(srng, 2, 4);
+      for (let tries = 0; tries < 120 && soaked.length < want; tries++) {
+        // 中心落在紙面中間七成（通常是寫字的地方），泡得最久的地方才會壓到字
+        const c = { x: range(srng, inner.x + inner.w * 0.15, inner.x + inner.w * 0.85), y: range(srng, inner.y + inner.h * 0.15, inner.y + inner.h * 0.85) };
+        const blob = blobPolygon(srng, c.x, c.y, range(srng, 8, 18), 0.35, 24);
+        if (!blob.every((p) => pointInPolygon(p, region) && pointInPolygon(p, outline))) continue;
+        if (polygonHitsAny(blob, input.protect.map((r) => inflateRect(r, 1.5)))) continue;
+        const b = polygonBounds(blob);
+        if (soaked.some((o) => rectsOverlap(polygonBounds(o), b))) continue;
+        soaked.push(blob);
+      }
+    }
     water = {
       polygons: [region, ...holesInWater],
       strength: Math.max(0, Math.min(100, s.waterStrength)),
       tides,
       wrinkles,
       tint: s.waterTint === 'blue' ? 'blue' : 'brown',
+      soaked,
     };
   }
   if (s.smudge) {
@@ -847,3 +868,40 @@ export function obscuringShapes(plan: EffectPlan): Rect[] {
 }
 
 export { polygonHitsAny };
+
+export type Rgb = readonly [number, number, number];
+
+/** 浸水時字的樣子（由浸水程度決定），渲染時照這些數值畫。 */
+export interface WaterBleed {
+  /** 用紙色把原本清楚的字洗淡的程度（0～1）。 */
+  readonly wash: number;
+  /** 水漬本身的染色透明度。 */
+  readonly stain: number;
+  /**
+   * 暈開的字：把字染成 color、模糊 blur（公釐）、透明度 opacity，依序疊上。
+   * 第一層是字外圍擴散出去的暈，第二層是變淡、變色、邊緣糊掉的字身。
+   */
+  readonly layers: readonly { readonly color: Rgb; readonly blur: number; readonly opacity: number }[];
+  /** 泡得最久的幾塊：再洗淡 wash，再暈開成 blur（公釐），那裡的字幾乎無法辨識。 */
+  readonly soaked: { readonly wash: number; readonly color: Rgb; readonly blur: number; readonly opacity: number } | null;
+}
+
+/**
+ * 浸水程度對應的暈開。字約 4～6 公釐大，筆畫約 0.3～0.6 公釐粗：
+ * 程度 50 時外圍的暈約 1 公釐、字身糊開約 0.4 公釐並偏褐或偏藍，一眼看得出字邊擴散、變色；
+ * 80 以上字身糊開超過一筆的寬度、原本的字被洗掉大半，泡得最久的幾塊暈開 2 公釐以上，那些字幾乎無法辨識。
+ */
+export function waterBleed(strength: number, tint: 'blue' | 'brown'): WaterBleed {
+  const k = Math.max(0, Math.min(100, strength)) / 100;
+  const halo: Rgb = tint === 'blue' ? [62, 86, 130] : [128, 84, 42];
+  const body: Rgb = tint === 'blue' ? [40, 52, 88] : [82, 52, 28];
+  return {
+    wash: 0.16 + 0.74 * k,
+    stain: 0.05 + 0.1 * k,
+    layers: [
+      { color: halo, blur: 0.3 + 1.9 * k, opacity: 0.42 + 0.48 * k },
+      { color: body, blur: 0.1 + 0.95 * k, opacity: 0.6 + 0.35 * k },
+    ],
+    soaked: k >= 0.3 ? { wash: 0.3 * k, color: halo, blur: 0.6 + 2.6 * k, opacity: 0.45 + 0.45 * k } : null,
+  };
+}

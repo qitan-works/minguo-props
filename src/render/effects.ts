@@ -4,7 +4,7 @@
 // 取捨：大部分效果是向量（SVG 線條、漸層），PDF 小、列印不卡。只有浸水與抹糊的墨跡用了
 // 模糊（字的複製品加 CSS filter，只顯示在那一塊範圍內），列印時瀏覽器會把那一塊轉成點陣圖。
 
-import { planEffects, type CharMarks, type EffectPlan } from '../lib/effects.ts';
+import { planEffects, waterBleed, type CharMarks, type EffectPlan, type Rgb } from '../lib/effects.ts';
 import { PX_PER_MM, polygonToPath, type Point, type Polygon, type Rect } from '../lib/geometry.ts';
 import type { ConditionData } from '../props/conditions.ts';
 import { h, s } from '../ui/dom.ts';
@@ -92,8 +92,34 @@ function drawChar(svg: SVGSVGElement, marks: CharMarks | null): void {
   }
 }
 
-/** 字的複製品（拿掉標記與編號），模糊並染色後只顯示在指定範圍內。 */
-function bleedLayer(content: HTMLElement, polygons: readonly (readonly Point[])[], evenodd: boolean, filter: string, opacity: number): HTMLElement {
+/**
+ * 把墨色換成指定顏色的濾鏡（給暈開的字用）：顏色一律換成 rgb，透明度照原本的，越淺的顏色（例如紅色格線）越淡。
+ * CSS 的 sepia()、brightness() 改不動接近黑色的墨，所以用 SVG 的 feColorMatrix。
+ */
+function inkTintFilter(id: string, [r, g, b]: Rgb): SVGFilterElement {
+  const c = (v: number): string => (v / 255).toFixed(3);
+  return s(
+    'filter',
+    { attrs: { id, 'color-interpolation-filters': 'sRGB' } },
+    s('feColorMatrix', { attrs: { type: 'matrix', values: `0 0 0 0 ${c(r)}  0 0 0 0 ${c(g)}  0 0 0 0 ${c(b)}  -0.25 -0.45 -0.08 1 0` } }),
+  );
+}
+
+interface BleedStyle {
+  /** 換墨色的 SVG 濾鏡 id（見 inkTintFilter）。 */
+  readonly tint?: string;
+  /** 模糊（CSS 像素）。 */
+  readonly blur: number;
+  readonly opacity: number;
+  /** 先蓋一層紙色把底下清楚的字洗掉（0～1）。 */
+  readonly wash?: number;
+}
+
+/**
+ * 字的複製品（拿掉標記與編號），模糊並染色後只顯示在指定範圍內。
+ * 換色的濾鏡放在字上，模糊與透明度放在外層；都是一般的 CSS filter，預覽與列印的 PDF 相同。
+ */
+function bleedLayer(content: HTMLElement, polygons: readonly (readonly Point[])[], evenodd: boolean, style: BleedStyle): HTMLElement {
   const clone = content.cloneNode(true) as HTMLElement;
   for (const el of clone.querySelectorAll('[data-mark]')) el.removeAttribute('data-mark');
   for (const el of clone.querySelectorAll('[data-block-id]')) el.removeAttribute('data-block-id');
@@ -101,9 +127,11 @@ function bleedLayer(content: HTMLElement, polygons: readonly (readonly Point[])[
   clone.removeAttribute('id');
   clone.classList.add('fx-bleed-text');
   clone.setAttribute('aria-hidden', 'true');
-  clone.style.setProperty('filter', filter);
-  clone.style.setProperty('opacity', opacity.toFixed(2));
-  return h('div', { class: 'fx-bleed', style: { 'clip-path': `path(${evenodd ? 'evenodd, ' : ''}'${pxPath(polygons)}')` } }, clone);
+  if (style.tint) clone.style.setProperty('filter', `url(#${style.tint})`);
+  const blurred = h('div', { class: 'fx-bleed-blur', style: { filter: `blur(${style.blur.toFixed(2)}px)`, opacity: style.opacity.toFixed(2) } }, clone);
+  const wash = style.wash ?? 0;
+  const paperWash = wash > 0 ? [h('div', { class: 'fx-bleed-wash', style: { background: `rgb(250 244 228 / ${wash.toFixed(2)})` } })] : [];
+  return h('div', { class: 'fx-bleed', style: { 'clip-path': `path(${evenodd ? 'evenodd, ' : ''}'${pxPath(polygons)}')` } }, ...paperWash, blurred);
 }
 
 /** 把一份規劃畫到紙上。 */
@@ -210,13 +238,16 @@ function draw(paper: HTMLElement, content: HTMLElement | null, plan: EffectPlan,
   if (plan.water) {
     const region = plan.water.polygons[0] ?? [];
     const k = plan.water.strength / 100;
+    const look = waterBleed(plan.water.strength, plan.water.tint);
     svg.append(
-      s('path', { attrs: { d: plan.water.polygons.map(path).join(''), 'fill-rule': 'evenodd', fill: `rgb(250 244 228 / ${(0.22 + 0.4 * k).toFixed(2)})` } }),
-      s('path', { attrs: { d: plan.water.polygons.map(path).join(''), 'fill-rule': 'evenodd', fill: plan.water.tint === 'blue' ? `rgb(120 140 165 / ${(0.05 + 0.07 * k).toFixed(2)})` : `rgb(165 125 70 / ${(0.06 + 0.08 * k).toFixed(2)})` } }),
+      s('path', { attrs: { d: plan.water.polygons.map(path).join(''), 'fill-rule': 'evenodd', fill: `rgb(250 244 228 / ${look.wash.toFixed(2)})` } }),
+      s('path', { attrs: { d: plan.water.polygons.map(path).join(''), 'fill-rule': 'evenodd', fill: plan.water.tint === 'blue' ? `rgb(120 140 165 / ${look.stain.toFixed(2)})` : `rgb(165 125 70 / ${look.stain.toFixed(2)})` } }),
       strokePath(path(region), `rgb(140 100 50 / ${0.22 + 0.25 * k})`, 1.8),
       strokePath(path(region), `rgb(110 75 35 / ${0.4 + 0.3 * k})`, 0.35),
     );
     plan.water.tides.forEach((tide, i) => svg.appendChild(strokePath(path(tide), `rgb(125 88 42 / ${(0.28 - i * 0.06 + 0.12 * k).toFixed(2)})`, 0.3 - i * 0.05)));
+    // 泡得最久的幾塊乾掉後也留下一圈淡淡的潮線
+    for (const soak of plan.water.soaked) svg.appendChild(strokePath(path(soak), `rgb(125 88 42 / ${(0.12 + 0.16 * k).toFixed(2)})`, 0.22));
     for (const w of plan.water.wrinkles) {
       const d = `M${w.map((p) => `${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join('L')}`;
       svg.append(
@@ -252,12 +283,18 @@ function draw(paper: HTMLElement, content: HTMLElement | null, plan: EffectPlan,
   // 浸水與抹糊：把字複製一份、模糊並染色，只顯示在那一塊範圍內（墨水暈開、字邊擴散）。
   // 用一般的 CSS filter 而不是 backdrop-filter：後者在列印成 PDF 時不會畫出來，預覽和 PDF 會不一樣。
   if (content && plan.water && plan.water.strength > 0) {
-    const k = plan.water.strength / 100;
-    const tint = plan.water.tint === 'blue' ? 'sepia(1) hue-rotate(175deg) saturate(2.4) brightness(1.15)' : 'sepia(0.9) saturate(1.5) brightness(1.18)';
-    layer.appendChild(bleedLayer(content, plan.water.polygons, true, `blur(${(0.45 + 1.5 * k).toFixed(2)}px) ${tint}`, 0.5 + 0.38 * k));
+    const look = waterBleed(plan.water.strength, plan.water.tint);
+    look.layers.forEach((l, i) => {
+      defs.appendChild(inkTintFilter(`${id}-ink${i}`, l.color));
+      layer.appendChild(bleedLayer(content, plan.water!.polygons, true, { tint: `${id}-ink${i}`, blur: l.blur * PX_PER_MM, opacity: l.opacity }));
+    });
+    if (look.soaked && plan.water.soaked.length > 0) {
+      defs.appendChild(inkTintFilter(`${id}-soak`, look.soaked.color));
+      layer.appendChild(bleedLayer(content, plan.water.soaked, false, { tint: `${id}-soak`, blur: look.soaked.blur * PX_PER_MM, opacity: look.soaked.opacity, wash: look.soaked.wash }));
+    }
   }
   if (content && plan.smudges.length > 0) {
-    layer.appendChild(bleedLayer(content, plan.smudges, false, 'blur(1.4px)', 0.9));
+    layer.appendChild(bleedLayer(content, plan.smudges, false, { blur: 1.4, opacity: 0.9 }));
   }
   // 必毀區：濃墨塗抹，蓋在模糊層之上，字完全看不出來
   if (plan.blots.length > 0) {

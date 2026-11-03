@@ -6,6 +6,8 @@ import { annotateTelegram, countWords, type Codebook, type TelegramCell } from '
 import { telegramDateCode } from '../lib/yunmu.ts';
 import { PAPER_SIZES, isPaperKey } from '../props/common.ts';
 import type { TelegramData } from '../props/telegram.ts';
+import type { Polygon } from '../lib/geometry.ts';
+import { pickConditions } from '../props/conditions.ts';
 import { h, s } from '../ui/dom.ts';
 import { createPaperSurface, createSheet } from './sheet.ts';
 
@@ -70,7 +72,7 @@ function stamp(office: string, dateLines: readonly string[]): SVGSVGElement {
   );
 }
 
-export function renderTelegram(data: TelegramData, book: Codebook | null): TelegramRender {
+export function renderTelegram(data: TelegramData, book: Codebook | null, crop: Polygon | null = null): TelegramRender {
   const paperKey = isPaperKey(data.paper) ? data.paper : 'a5-landscape';
   const size = PAPER_SIZES[paperKey];
   const small = size.width * size.height < 40000;
@@ -80,12 +82,8 @@ export function renderTelegram(data: TelegramData, book: Codebook | null): Teleg
   const { paper, content } = createPaperSurface({
     width: size.width,
     height: size.height,
-    aging: data.aging,
-    folds: data.folds,
-    stains: data.stains,
-    effectSeed: data.effectSeed,
-    foldLines: size.width > size.height ? { horizontal: [], vertical: [0.5] } : { horizontal: [0.5], vertical: [] },
-    seedOffset: 23,
+    conditions: pickConditions(data),
+    crop,
     className: 'tg-paper',
   });
   sheet.appendChild(paper);
@@ -154,7 +152,8 @@ export function renderTelegram(data: TelegramData, book: Codebook | null): Teleg
       h(
         'div',
         {
-          class: ['tg-cell', `tg-${cell.kind}`, cell.kind === 'han' && cell.via !== undefined && 'tg-variant'],
+          class: ['tg-cell', `tg-${cell.kind}`, cell.kind === 'han' && cell.via !== undefined && 'tg-variant', cell.mark && `mk-${cell.mark}`],
+          dataset: cell.mark === 'protect' || cell.mark === 'destroy' ? { mark: cell.mark } : {},
           attrs: {
             title:
               cell.kind === 'missing'

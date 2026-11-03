@@ -8,6 +8,8 @@
 // 由右而左補滿，直到沒有空行；放不下時在最後一則截斷並加「（未完）」。
 // 所有斷行都由這裡計算，畫面上每一行都是固定的字，所以預覽、列印與「哪些字被剪到」的判斷完全一致。
 
+import { markedChars, type MarkKind } from '../markup.ts';
+
 export type BlockKind = 'news' | 'short' | 'ad' | 'notice' | 'list' | 'tiny' | 'photo';
 
 export interface SourceBlock {
@@ -30,6 +32,8 @@ export interface TextLine {
   /** 字的大小（1 = 內文字；2 = 兩倍大）。一行佔的寬度等於 size 行。 */
   readonly size: number;
   readonly style: LineStyle;
+  /** 逐字的文字層標記（與 text 的字一一對應）；沒有標記時省略。 */
+  readonly marks?: readonly (MarkKind | undefined)[];
 }
 
 export interface LaidBlock {
@@ -73,11 +77,15 @@ const NO_LINE_END = new Set(Array.from('（「『〈《【〔'));
  * 避頭點：行首若是標點，把上一行最後一字移下來；避尾點：行尾若是開括號，移到下一行。
  */
 export function breakLines(text: string, width: number, indent = 0): string[] {
+  return breakTokens(Array.from(text), width, indent, (c) => c, () => '　').map((l) => l.join(''));
+}
+
+/** 同 breakLines，但可帶著每個字的附加資料（例如文字層標記）一起斷行。 */
+export function breakTokens<T>(tokens: readonly T[], width: number, indent: number, charOf: (t: T) => string, space: () => T): T[][] {
   if (width < 2) throw new RangeError(`每行至少要 2 字：${width}`);
-  const chars = Array.from(text);
-  const lines: string[][] = [];
-  let current: string[] = Array.from('　'.repeat(Math.min(indent, width - 1)));
-  for (const ch of chars) {
+  const lines: T[][] = [];
+  let current: T[] = Array.from({ length: Math.min(indent, width - 1) }, space);
+  for (const ch of tokens) {
     if (current.length >= width) {
       lines.push(current);
       current = [];
@@ -87,24 +95,24 @@ export function breakLines(text: string, width: number, indent = 0): string[] {
   if (current.length > 0) lines.push(current);
   // 修正避頭、避尾
   for (let i = 1; i < lines.length; i++) {
-    const prev = lines[i - 1] as string[];
-    const line = lines[i] as string[];
-    if (NO_LINE_START.has(line[0] ?? '') && prev.length > 1) {
-      const moved = prev.pop() as string;
-      line.unshift(moved);
+    const prev = lines[i - 1] as T[];
+    const line = lines[i] as T[];
+    if (line[0] !== undefined && NO_LINE_START.has(charOf(line[0])) && prev.length > 1) {
+      line.unshift(prev.pop() as T);
     }
-    if (NO_LINE_END.has(prev[prev.length - 1] ?? '') && prev.length > 1) {
-      line.unshift(prev.pop() as string);
+    const tail = prev[prev.length - 1];
+    if (tail !== undefined && NO_LINE_END.has(charOf(tail)) && prev.length > 1) {
+      line.unshift(prev.pop() as T);
     }
     // 移下來之後這一行可能超過寬度：多出的字往後推。
     while (line.length > width) {
-      const overflow = line.pop() as string;
+      const overflow = line.pop() as T;
       const next = lines[i + 1];
       if (next) next.unshift(overflow);
       else lines.push([overflow]);
     }
   }
-  return lines.map((l) => l.join(''));
+  return lines;
 }
 
 function paragraphsOf(text: string): string[] {
@@ -126,7 +134,13 @@ export function layoutLines(block: SourceBlock, cpl: number): { lines: TextLine[
   const inner = boxed ? cpl - 1 : cpl;
   const push = (text: string, size: number, style: LineStyle, indent = 0): void => {
     const width = Math.max(2, Math.floor(inner / size));
-    for (const t of breakLines(toFullWidth(text), width, indent)) lines.push({ text: t, size, style });
+    // 文字層標記（[保:…] 等）先拆開，再逐字轉全形；標記跟著字一起斷行。
+    const tokens = markedChars(text).map((t) => ({ ch: toFullWidth(t.ch), mark: t.mark }));
+    const anyMark = tokens.some((t) => t.mark !== undefined);
+    for (const line of breakTokens(tokens, width, indent, (t) => t.ch, () => ({ ch: '　', mark: undefined }))) {
+      const textLine = line.map((t) => t.ch).join('');
+      lines.push(anyMark ? { text: textLine, size, style, marks: line.map((t) => t.mark) } : { text: textLine, size, style });
+    }
   };
   switch (block.kind) {
     case 'news':
@@ -207,7 +221,10 @@ export function layoutBlock(block: SourceBlock, cpl: number, maxSlots?: number):
   if (lastIndex < 0) return null;
   const last = kept[lastIndex] as TextLine;
   const chars = Array.from(last.text).slice(0, Math.max(0, width - mark.length));
-  kept[lastIndex] = { text: chars.join('') + TRUNCATION_MARK, size: 1, style: last.style };
+  const truncatedLine: TextLine = last.marks
+    ? { text: chars.join('') + TRUNCATION_MARK, size: 1, style: last.style, marks: [...last.marks.slice(0, chars.length), ...mark.map(() => undefined)] }
+    : { text: chars.join('') + TRUNCATION_MARK, size: 1, style: last.style };
+  kept[lastIndex] = truncatedLine;
   kept.length = lastIndex + 1;
   return { lines: kept, slots: slotsOf(kept, boxed), truncated: true, boxed };
 }

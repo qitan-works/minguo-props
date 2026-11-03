@@ -12,7 +12,10 @@ import { blockRect, pageGeometry, type PageGeometry } from '../lib/newspaper/pag
 import { PAPER_SIZES, isPaperKey } from '../props/common.ts';
 import type { NewspaperExtras } from '../props/extras.ts';
 import type { NewspaperData } from '../props/newspaper.ts';
+import { pickConditions } from '../props/conditions.ts';
 import { h } from '../ui/dom.ts';
+import { fillMarkedLine } from '../ui/marked.ts';
+import { setPaperCrop } from './effects.ts';
 import { createPaperSurface, createSheet } from './sheet.ts';
 
 export interface FullPageRender {
@@ -31,9 +34,8 @@ function mm(n: number): string {
 const CENTERED = new Set(['big', 'center', 'heading']);
 
 function lineElement(line: TextLine, geom: PageGeometry, height: number): HTMLElement {
-  return h('div', {
+  const el = h('div', {
     class: ['nl', `nl-${line.style}`],
-    text: line.text,
     style: {
       'font-size': mm(geom.cell * line.size),
       'inline-size': mm(height),
@@ -42,6 +44,7 @@ function lineElement(line: TextLine, geom: PageGeometry, height: number): HTMLEl
       'text-align': CENTERED.has(line.style) ? 'center' : 'start',
     },
   });
+  return fillMarkedLine(el, line.text, line.marks);
 }
 
 function blockElement(block: PlacedBlock, geom: PageGeometry, photo: string, locked: boolean): HTMLElement {
@@ -112,12 +115,8 @@ export function renderNewspaperFull(data: NewspaperData, extras: NewspaperExtras
   const { paper, content } = createPaperSurface({
     width: size.width,
     height: size.height,
-    aging: data.aging,
-    folds: data.folds,
-    stains: data.stains,
-    effectSeed: data.effectSeed,
-    foldLines: size.width < size.height ? { horizontal: [0.5], vertical: [0.5] } : { horizontal: [0.5], vertical: [0.5] },
-    seedOffset: 101,
+    conditions: pickConditions(data),
+    crop: extras.crop,
     className: 'nf-paper',
   });
   content.classList.add('nf');
@@ -170,7 +169,8 @@ export function renderNewspaperFull(data: NewspaperData, extras: NewspaperExtras
     const style = isCutStyle(data.cutStyle) ? data.cutStyle : 'scissors';
     const polygon = cutPolygon(frame, style, data.cutSeed);
     cut = { polygon, frame };
-    paper.style.setProperty('clip-path', `path('${polygonToPath(polygon, PX_PER_MM)}')`);
+    paper.style.setProperty('clip-path', `path('${polygonToPath(extras.crop ?? polygon, PX_PER_MM)}')`);
+    setPaperCrop(paper, extras.crop ?? polygon);
     // 把剪下的紙片放到列印紙張的正中央
     sheet.classList.add('sheet--cut');
     paper.style.setProperty('left', mm(size.width / 2 - (frame.x + frame.w / 2)));

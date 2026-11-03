@@ -3,7 +3,10 @@
 import { formatMinguoDate, formatMonthDay, parseIsoDate } from '../lib/minguo.ts';
 import { PAPER_SIZES, isPaperKey } from '../props/common.ts';
 import type { LetterData } from '../props/letter.ts';
+import type { Polygon } from '../lib/geometry.ts';
+import { pickConditions } from '../props/conditions.ts';
 import { h, paragraphs } from '../ui/dom.ts';
+import { fillMarked } from '../ui/marked.ts';
 import { createPaperSurface, createSheet } from './sheet.ts';
 
 export function letterDateText(data: LetterData): string {
@@ -20,7 +23,7 @@ export function letterDateText(data: LetterData): string {
   }
 }
 
-export function renderLetter(data: LetterData): HTMLElement {
+export function renderLetter(data: LetterData, crop: Polygon | null = null): HTMLElement {
   const paperKey = isPaperKey(data.paper) ? data.paper : 'a4-portrait';
   const size = PAPER_SIZES[paperKey];
   const k = size.width / 210;
@@ -30,12 +33,8 @@ export function renderLetter(data: LetterData): HTMLElement {
   const { paper, content } = createPaperSurface({
     width: size.width,
     height: size.height,
-    aging: data.aging,
-    folds: data.folds,
-    stains: data.stains,
-    effectSeed: data.effectSeed,
-    foldLines: { horizontal: [1 / 3, 2 / 3], vertical: [0.5] },
-    seedOffset: 37,
+    conditions: pickConditions(data),
+    crop,
     className: 'lt-paper',
   });
   sheet.appendChild(paper);
@@ -56,14 +55,14 @@ export function renderLetter(data: LetterData): HTMLElement {
   content.appendChild(h('div', { class: 'lt-frame', attrs: { 'aria-hidden': 'true' } }));
 
   const text = h('div', { class: 'lt-text vt hand', attrs: { 'data-fit': '' } });
-  if (data.salutation) text.appendChild(h('p', { class: 'lt-salutation', text: data.salutation }));
+  if (data.salutation) text.appendChild(fillMarked(h('p', { class: 'lt-salutation' }), data.salutation));
   for (const para of paragraphs(data.body)) {
-    text.appendChild(h('p', { class: ['lt-p', data.indent && 'lt-indent'], text: para }));
+    text.appendChild(fillMarked(h('p', { class: ['lt-p', data.indent && 'lt-indent'] }), para));
   }
   paragraphs(data.closing).forEach((line, i) => {
-    text.appendChild(h('p', { class: ['lt-closing', i === 0 ? 'lt-closing-first' : 'lt-closing-raise'], text: line }));
+    text.appendChild(fillMarked(h('p', { class: ['lt-closing', i === 0 ? 'lt-closing-first' : 'lt-closing-raise'] }), line));
   });
-  if (data.signature) text.appendChild(h('p', { class: 'lt-signature', text: data.signature }));
+  if (data.signature) text.appendChild(fillMarked(h('p', { class: 'lt-signature' }), data.signature));
   const dateText = letterDateText(data);
   if (dateText) text.appendChild(h('p', { class: 'lt-date', text: dateText }));
   content.appendChild(text);

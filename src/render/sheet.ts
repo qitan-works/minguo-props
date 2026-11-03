@@ -1,33 +1,18 @@
-// 紙張與做舊效果。全部用 CSS 漸層與 SVG 濾鏡（feTurbulence 等）即時產生，
-// 不使用任何圖片素材。濾鏡定義在 index.html 的 <svg class="svg-defs">。
+// 紙張：頁面（列印時的一頁）與紙面（道具本體）。
+// 紙面在建立時只放泛黃色調與紙紋；紙邊、破洞、浸水、斑點等「紙張狀況」要等內容排好、
+// 量出保護區與必毀區的位置之後，才由 src/render/effects.ts 畫上去（見 applyPaperEffects）。
+// 全部用 CSS、SVG 與 canvas 即時產生，不使用任何圖片素材。
 
+import type { Polygon } from '../lib/geometry.ts';
+import { mulberry32 } from '../lib/random.ts';
 import { PAPER_SIZES, type PaperKey } from '../props/common.ts';
-import { h, s } from '../ui/dom.ts';
+import type { ConditionData } from '../props/conditions.ts';
+import { h } from '../ui/dom.ts';
+import { registerPaper } from './effects.ts';
 
-export interface AgingOptions {
-  readonly aging: string;
-  readonly folds: boolean;
-  readonly stains: boolean;
-  readonly effectSeed: number;
-}
-
-export interface FoldLines {
-  /** 水平摺痕位置（0～1，由上往下）。 */
-  readonly horizontal: readonly number[];
-  /** 垂直摺痕位置（0～1，由左往右）。 */
-  readonly vertical: readonly number[];
-}
-
-/** 可重現的亂數（mulberry32），同一個種子永遠得到同樣的污漬位置。 */
+/** 可重現的亂數（mulberry32）。 */
 export function seededRandom(seed: number): () => number {
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
+  return mulberry32(seed);
 }
 
 /** 建立一張「頁面」：列印時剛好是一頁紙。 */
@@ -40,20 +25,23 @@ export function createSheet(paper: PaperKey): HTMLDivElement {
   });
 }
 
-export interface PaperSurfaceOptions extends AgingOptions {
+export interface PaperSurfaceOptions {
   readonly width: number;
   readonly height: number;
-  readonly foldLines: FoldLines;
-  /** 剪報的不規則剪裁邊緣。 */
+  readonly conditions: ConditionData;
+  /** 同一頁有多張紙（名片拼版）時用來讓每張的隨機效果不同。 */
+  readonly variant?: number;
+  /** 第一版的「剪報毛邊」（只在沒有選擇其他紙邊樣式時使用）。 */
   readonly roughEdge?: boolean;
-  /** 不同道具用不同的種子偏移，避免污漬總在同一處。 */
-  readonly seedOffset: number;
+  /** 自由裁切或「從整版剪下」的外形（紙面座標，公釐）。 */
+  readonly crop?: Polygon | null;
   readonly className: string;
 }
 
 /** 建立紙面（道具本體），回傳紙面與放內容的容器。 */
 export function createPaperSurface(options: PaperSurfaceOptions): { paper: HTMLDivElement; content: HTMLDivElement } {
-  const level = ['none', 'light', 'medium', 'heavy'].includes(options.aging) ? options.aging : 'none';
+  const c = options.conditions;
+  const level = ['none', 'light', 'medium', 'heavy'].includes(c.aging) ? c.aging : 'none';
   const content = h('div', { class: 'paper-content' });
   const paper = h(
     'div',
@@ -63,28 +51,21 @@ export function createPaperSurface(options: PaperSurfaceOptions): { paper: HTMLD
     },
     content,
   );
-
   if (level !== 'none') {
     paper.appendChild(h('div', { class: 'age-layer age-tone', attrs: { 'aria-hidden': 'true' } }));
     paper.appendChild(grainLayer());
   }
-  if (options.folds) {
-    for (const y of options.foldLines.horizontal) {
-      paper.appendChild(h('div', { class: 'age-layer fold fold-h', style: { top: `${y * 100}%` }, attrs: { 'aria-hidden': 'true' } }));
-    }
-    for (const x of options.foldLines.vertical) {
-      paper.appendChild(h('div', { class: 'age-layer fold fold-v', style: { left: `${x * 100}%` }, attrs: { 'aria-hidden': 'true' } }));
-    }
-  }
-  if (options.stains) {
-    const seed = options.effectSeed;
-    paper.appendChild(stainLayer(options.width, options.height, seed * 7919 + options.seedOffset));
-  }
-  if (options.roughEdge) {
-    const seed = options.effectSeed * 104729 + options.seedOffset;
-    paper.style.setProperty('clip-path', roughEdgePolygon(options.width, options.height, seed));
+  if (options.roughEdge && c.edge === 'none' && !options.crop) {
+    paper.style.setProperty('clip-path', roughEdgePolygon(options.width, options.height, c.effectSeed * 104729 + (options.variant ?? 0)));
     paper.classList.add('rough-edge');
   }
+  registerPaper(paper, {
+    width: options.width,
+    height: options.height,
+    conditions: c,
+    crop: options.crop ?? null,
+    variant: options.variant ?? 0,
+  });
   return { paper, content };
 }
 
@@ -153,57 +134,6 @@ function grainLayer(): HTMLElement {
   });
 }
 
-function stainLayer(width: number, height: number, seed: number): SVGSVGElement {
-  const rand = seededRandom(seed);
-  const svg = s('svg', {
-    class: 'age-layer age-stains',
-    attrs: { 'aria-hidden': 'true', viewBox: `0 0 ${width} ${height}`, preserveAspectRatio: 'xMidYMid slice' },
-  });
-  const scale = Math.min(width, height);
-  // 兩三團水漬
-  const blots = 2 + Math.floor(rand() * 2);
-  for (let i = 0; i < blots; i++) {
-    const cx = width * (0.1 + rand() * 0.8);
-    const cy = height * (0.1 + rand() * 0.8);
-    const r = scale * (0.05 + rand() * 0.08);
-    svg.appendChild(
-      s('ellipse', {
-        class: 'stain-blot',
-        attrs: { cx, cy, rx: r, ry: r * (0.7 + rand() * 0.5), filter: 'url(#f-stain)' },
-      }),
-    );
-  }
-  // 一個茶杯或咖啡杯底的圓環（不一定完整）
-  const cx = width * (0.15 + rand() * 0.7);
-  const cy = height * (0.15 + rand() * 0.7);
-  const r = scale * (0.07 + rand() * 0.04);
-  const circumference = 2 * Math.PI * r;
-  svg.appendChild(
-    s('circle', {
-      class: 'stain-ring',
-      attrs: {
-        cx,
-        cy,
-        r,
-        'stroke-width': Math.max(0.6, scale * 0.006),
-        'stroke-dasharray': `${circumference * (0.55 + rand() * 0.4)} ${circumference}`,
-        transform: `rotate(${Math.floor(rand() * 360)} ${cx} ${cy})`,
-        filter: 'url(#f-ring)',
-      },
-    }),
-  );
-  // 幾點細小斑點（霉斑）
-  const specks = 6 + Math.floor(rand() * 8);
-  for (let i = 0; i < specks; i++) {
-    svg.appendChild(
-      s('circle', {
-        class: 'stain-speck',
-        attrs: { cx: width * rand(), cy: height * rand(), r: 0.2 + rand() * 0.7 },
-      }),
-    );
-  }
-  return svg;
-}
 
 /**
  * 剪刀剪出的邊緣：沿四邊大約每 3 公釐取一點，向內隨機偏移。

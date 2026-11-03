@@ -1,6 +1,7 @@
 // 信箋：欄位定義與預設內容。
 
-import { agingFields, paperOptions } from './common.ts';
+import { paperOptions } from './common.ts';
+import { conditionDefaults, conditionFields } from './conditions.ts';
 import type { DataOf, Field } from './schema.ts';
 
 export const letterFields = [
@@ -51,7 +52,7 @@ export const letterFields = [
   { key: 'date', type: 'date', label: '日期', group: '內容', min: '1912-01-01', max: '1949-12-31', showIf: { key: 'dateMode', in: ['year', 'minguo', 'monthday'] } },
   { key: 'dayStyle', type: 'checkbox', label: '日期用「廿」「卅」', group: '內容', showIf: { key: 'dateMode', in: ['year', 'minguo', 'monthday'] } },
 
-  ...agingFields('紙張效果'),
+  ...conditionFields('紙張狀況', '更多痕跡'),
 ] as const satisfies readonly Field[];
 
 export type LetterData = DataOf<typeof letterFields>;
@@ -72,8 +73,5 @@ export const letterDefaults: LetterData = {
   dateMode: 'year',
   date: '1928-11-05',
   dayStyle: false,
-  aging: 'light',
-  folds: true,
-  stains: true,
-  effectSeed: 61493,
+  ...conditionDefaults({ aging: 'light', folds: true, foldStyle: 'thirds', stains: true, effectSeed: 61493 }),
 };

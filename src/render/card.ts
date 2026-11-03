@@ -4,6 +4,8 @@ import { formatMonthDay, parseIsoDate, weekdayOf } from '../lib/minguo.ts';
 import { toChineseDigits } from '../lib/numerals.ts';
 import type { CardData } from '../props/card.ts';
 import type { PaperKey } from '../props/common.ts';
+import type { Polygon } from '../lib/geometry.ts';
+import { pickConditions } from '../props/conditions.ts';
 import { h } from '../ui/dom.ts';
 import { createPaperSurface, createSheet } from './sheet.ts';
 
@@ -40,16 +42,13 @@ function cardContent(data: CardData): HTMLElement[] {
   ].filter((el): el is HTMLElement => el !== null);
 }
 
-function cardSurface(data: CardData, width: number, height: number, index: number): HTMLElement {
+function cardSurface(data: CardData, width: number, height: number, index: number, crop: Polygon | null): HTMLElement {
   const { paper, content } = createPaperSurface({
     width,
     height,
-    aging: data.aging,
-    folds: data.folds,
-    stains: data.stains,
-    effectSeed: data.effectSeed,
-    foldLines: width > height ? { horizontal: [], vertical: [0.5] } : { horizontal: [0.5], vertical: [] },
-    seedOffset: 53 + index * 17,
+    conditions: pickConditions(data),
+    variant: index,
+    crop,
     className: `cd-paper stock-${data.stock}`,
   });
   content.classList.add('cd', data.style === 'invite' ? 'cd-invite' : 'cd-card', width > height ? 'cd-landscape' : 'cd-portrait');
@@ -58,7 +57,7 @@ function cardSurface(data: CardData, width: number, height: number, index: numbe
   return paper;
 }
 
-export function renderCard(data: CardData): HTMLElement {
+export function renderCard(data: CardData, crop: Polygon | null = null): HTMLElement {
   const landscape = data.orientation === 'landscape';
   const width = landscape ? 90 : 54;
   const height = landscape ? 54 : 90;
@@ -77,12 +76,12 @@ export function renderCard(data: CardData): HTMLElement {
         '--card-h': `${height}mm`,
       },
     });
-    for (let i = 0; i < 10; i++) grid.appendChild(h('div', { class: 'cd-slot' }, cardSurface(data, width, height, i)));
+    for (let i = 0; i < 10; i++) grid.appendChild(h('div', { class: 'cd-slot' }, cardSurface(data, width, height, i, crop)));
     sheet.appendChild(grid);
     return sheet;
   }
 
   const sheet = createSheet(landscape ? 'card-landscape' : 'card-portrait');
-  sheet.appendChild(cardSurface(data, width, height, 0));
+  sheet.appendChild(cardSurface(data, width, height, 0, crop));
   return sheet;
 }

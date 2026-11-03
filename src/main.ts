@@ -7,6 +7,9 @@ import { renderCard } from './render/card.ts';
 import { renderLetter } from './render/letter.ts';
 import { fitNewspaperToContent, renderNewspaper } from './render/newspaper.ts';
 import { renderNewspaperFull, type FullPageRender } from './render/newspaper-full.ts';
+import { applyPaperEffects } from './render/effects.ts';
+import { applyPreset, pickConditions } from './props/conditions.ts';
+import { startCropDrawing, type CropSession, type CropTool } from './ui/crop.ts';
 import { findOverflow } from './render/sheet.ts';
 import { renderTelegram, type TelegramRender } from './render/telegram.ts';
 import {
@@ -139,6 +142,14 @@ function rebuildForm(): void {
   const kind = state.active;
   const form = buildForm(PROP_FIELDS[kind], currentValues(), {
     onChange(key, value) {
+      if (key === 'preset') {
+        // 情境預設：一次套用一組紙張狀況，再重建表單讓欄位顯示新值
+        state = updateProp(state, kind, applyPreset(pickConditions(currentValues()), String(value)) as never);
+        queueRender();
+        scheduleSave();
+        rebuildForm();
+        return;
+      }
       state = updateProp(state, kind, { [key]: value } as never);
       refreshForm?.(currentValues());
       queueRender();
@@ -150,6 +161,7 @@ function rebuildForm(): void {
   });
   refreshForm = form.refresh;
   els.form.replaceChildren(form.root);
+  els.form.appendChild(cropEditor(kind));
   if (kind === 'newspaper') {
     els.form.appendChild(
       buildItemsEditor(state.extras.newspaper.items, (items) => {
@@ -160,6 +172,55 @@ function rebuildForm(): void {
     );
   }
   els.form.setAttribute('aria-labelledby', `tab-${kind}`);
+}
+
+// ---- 自由裁切 ----
+
+let cropSession: CropSession | null = null;
+
+function cropEditor(kind: PropKind): HTMLElement {
+  const has = state.extras[kind].crop !== null;
+  const status = h('p', { class: 'form-hint', text: has ? '已設定自由裁切範圍。' : '尚未設定（整張紙）。' });
+  const start = (tool: CropTool): void => {
+    cropSession?.cancel();
+    queueRender();
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        cropSession = startCropDrawing(
+          els.stage,
+          tool,
+          (points) => {
+            state = updateExtras(state, kind, { crop: points } as never);
+            scheduleSave();
+          },
+          () => {
+            cropSession = null;
+            rebuildForm();
+            queueRender();
+          },
+        );
+      }),
+    );
+  };
+  const polygon = h('button', { class: 'btn btn-small', attrs: { type: 'button' }, text: '在預覽上畫多邊形' });
+  const lasso = h('button', { class: 'btn btn-small', attrs: { type: 'button' }, text: '手繪套索' });
+  const clear = h('button', { class: 'btn btn-small', attrs: { type: 'button', disabled: !has }, text: '清除自由裁切' });
+  polygon.addEventListener('click', () => start('polygon'));
+  lasso.addEventListener('click', () => start('lasso'));
+  clear.addEventListener('click', () => {
+    state = updateExtras(state, kind, { crop: null } as never);
+    scheduleSave();
+    rebuildForm();
+    queueRender();
+  });
+  return h(
+    'fieldset',
+    { class: 'form-group' },
+    h('legend', { text: '自由裁切' }),
+    h('p', { class: 'form-hint', text: '框出要保留的部分；搭配「紙邊」選擇手撕、火燒等樣式，會沿著你畫的形狀加工。' }),
+    h('div', { class: 'crop-buttons' }, polygon, lasso, clear),
+    status,
+  );
 }
 
 // ---- 預覽 ----
@@ -223,19 +284,19 @@ function renderPreview(): void {
         lastFull = renderNewspaperFull(np, state.extras.newspaper);
         sheet = lastFull.sheet;
       } else {
-        sheet = renderNewspaper(np);
+        sheet = renderNewspaper(np, state.extras.newspaper.crop);
       }
       break;
     }
     case 'telegram':
-      telegram = renderTelegram(state.props.telegram, codebook);
+      telegram = renderTelegram(state.props.telegram, codebook, state.extras.telegram.crop);
       sheet = telegram.sheet;
       break;
     case 'letter':
-      sheet = renderLetter(state.props.letter);
+      sheet = renderLetter(state.props.letter, state.extras.letter.crop);
       break;
     case 'card':
-      sheet = renderCard(state.props.card);
+      sheet = renderCard(state.props.card, state.extras.card.crop);
       break;
   }
   // 列印用的頁面名稱（見 print.css）
@@ -243,6 +304,7 @@ function renderPreview(): void {
   const scaler = h('div', { class: 'sheet-scaler' }, sheet);
   els.stage.replaceChildren(scaler);
   fitNewspaperToContent(sheet);
+  applyPaperEffects(sheet);
   fitPreview();
   renderTelegramInfo(telegram);
   requestAnimationFrame(() => {

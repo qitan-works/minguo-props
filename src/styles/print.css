@@ -104,6 +104,8 @@ html[data-page='card-portrait'] body {
   .overflow-warning,
   .print-tip,
   .popover,
+  .crop-overlay,
+  .crop-hint,
   .noscript {
     display: none !important;
   }

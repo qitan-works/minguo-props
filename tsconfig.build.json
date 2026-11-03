@@ -1,0 +1,18 @@
+{
+  // 建置用：只編譯瀏覽器端程式（src/），輸出到 dist/js。
+  // 瀏覽器端不能用 Node 的型別，所以 types 清空。
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": [],
+    "lib": ["es2023", "dom", "dom.iterable"],
+    "module": "es2022",
+    "moduleResolution": "bundler",
+    "noEmit": false,
+    "outDir": "dist/js",
+    "rootDir": "src",
+    "sourceMap": false,
+    "declaration": false,
+    "removeComments": false
+  },
+  "include": ["src/**/*.ts"]
+}

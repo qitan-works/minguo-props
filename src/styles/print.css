@@ -1,0 +1,134 @@
+/* 列印樣式：只印出道具本身，紙張大小由具名頁面（@page 名稱）決定。 */
+
+@page {
+  margin: 0;
+}
+
+@page a4-portrait {
+  size: 210mm 297mm;
+  margin: 0;
+}
+
+@page a4-landscape {
+  size: 297mm 210mm;
+  margin: 0;
+}
+
+@page a5-portrait {
+  size: 148mm 210mm;
+  margin: 0;
+}
+
+@page a5-landscape {
+  size: 210mm 148mm;
+  margin: 0;
+}
+
+@page card-landscape {
+  size: 90mm 54mm;
+  margin: 0;
+}
+
+@page card-portrait {
+  size: 54mm 90mm;
+  margin: 0;
+}
+
+/*
+ * 整份文件都套用目前道具的頁面名稱：否則頁面上其他（不顯示的）元素會落在預設頁面，
+ * 偶爾在 PDF 後面多出一張空白的預設尺寸頁。main.ts 會把頁面名稱寫到 <html data-page>。
+ */
+html[data-page='a4-portrait'] body {
+  page: a4-portrait;
+}
+
+html[data-page='a4-landscape'] body {
+  page: a4-landscape;
+}
+
+html[data-page='a5-portrait'] body {
+  page: a5-portrait;
+}
+
+html[data-page='a5-landscape'] body {
+  page: a5-landscape;
+}
+
+html[data-page='card-landscape'] body {
+  page: card-landscape;
+}
+
+html[data-page='card-portrait'] body {
+  page: card-portrait;
+}
+
+.sheet[data-page='a4-portrait'] {
+  page: a4-portrait;
+}
+
+.sheet[data-page='a4-landscape'] {
+  page: a4-landscape;
+}
+
+.sheet[data-page='a5-portrait'] {
+  page: a5-portrait;
+}
+
+.sheet[data-page='a5-landscape'] {
+  page: a5-landscape;
+}
+
+.sheet[data-page='card-landscape'] {
+  page: card-landscape;
+}
+
+.sheet[data-page='card-portrait'] {
+  page: card-portrait;
+}
+
+@media print {
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  html,
+  body {
+    margin: 0;
+    padding: 0;
+    background: none;
+  }
+
+  .app-header,
+  .editor,
+  .overflow-warning,
+  .print-tip,
+  .noscript {
+    display: none !important;
+  }
+
+  .workspace,
+  .preview,
+  .preview-stage {
+    display: block;
+    position: static;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    overflow: visible;
+  }
+
+  .sheet-scaler {
+    width: auto !important;
+    height: auto !important;
+  }
+
+  .sheet-scaler > .sheet {
+    position: relative;
+    transform: none;
+    box-shadow: none;
+    break-inside: avoid;
+  }
+}

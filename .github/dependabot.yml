@@ -1,0 +1,18 @@
+# Dependabot 版本更新：每週檢查一次；新版本發布滿 7 天才提出更新（與 pnpm 的 minimumReleaseAge 一致）。
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 5

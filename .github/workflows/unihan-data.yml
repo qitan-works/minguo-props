@@ -1,0 +1,37 @@
+# Unihan 資料驗證：直接從 unicode.org 下載固定版本的 Unihan.zip，
+# 驗證 SHA-256，重新產生電碼資料，並確認與已提交的 src/data/telegraph.json 完全一致。
+# 只在資料或產生腳本變動時執行（也可手動執行）。腳本只用 Node 內建模組，不需要安裝依賴。
+name: Unihan 資料驗證
+
+on:
+  pull_request:
+    paths:
+      - scripts/unihan-telegraph.ts
+      - scripts/lib/unihan.ts
+      - scripts/lib/zip.ts
+      - src/data/telegraph.json
+      - .github/workflows/unihan-data.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: 從 unicode.org 重新產生並比對
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: 取得原始碼
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: 安裝 Node.js 24
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+
+      - name: 下載、驗證並比對
+        run: node scripts/unihan-telegraph.ts --check

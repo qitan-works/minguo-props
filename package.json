@@ -16,7 +16,9 @@
     "build": "node scripts/build.ts",
     "serve": "node scripts/serve.ts",
     "data:telegraph": "node scripts/unihan-telegraph.ts",
-    "data:check": "node scripts/unihan-telegraph.ts --check"
+    "data:check": "node scripts/unihan-telegraph.ts --check",
+    "fonts:generate": "node scripts/fonts-generate.ts",
+    "fonts:check": "node scripts/fonts-generate.ts --check"
   },
   "devDependencies": {
     "@fontsource-variable/noto-serif-tc": "5.3.1",

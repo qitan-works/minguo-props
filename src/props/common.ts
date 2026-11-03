@@ -47,11 +47,38 @@ export function isPaperKey(value: string): value is PaperKey {
   return Object.prototype.hasOwnProperty.call(PAPER_SIZES, value);
 }
 
-/** 每個道具的標題、內文、手寫部分可分別選字型。 */
+const FONT_ERA_OPTIONS = [
+  { value: 'custom', label: '自訂' },
+  { value: '1910s', label: '1910 年代（行書、明體）' },
+  { value: '1920s', label: '1920 年代（顏楷、超明、鋼筆行楷）' },
+  { value: '1930s', label: '1930 年代（特黑、仿宋、清松行楷）' },
+] as const satisfies readonly Option[];
+
+/** 電報、信箋、名片用：先選一組年代字型，再個別調整。 */
+export function fontEraField<G extends string>(group: G) {
+  return { key: 'fontEra', type: 'select', label: '字型年代組合', options: FONT_ERA_OPTIONS, group, hint: '一次換掉下面五個字型；個別調整後顯示為「自訂」。' } as const;
+}
+
+/** 每個道具的報頭、標題、內文、廣告大字、手寫部分可分別選字型。 */
 export function fontFields<G extends string>(group: G) {
   return [
+    { key: 'fontMasthead', type: 'select', label: '報頭字型', options: FONT_OPTIONS, group, hint: '報紙的報頭；電報的局名；請帖的抬頭。' },
     { key: 'fontTitle', type: 'select', label: '標題字型', options: FONT_OPTIONS, group },
     { key: 'fontBody', type: 'select', label: '內文字型', options: FONT_OPTIONS, group },
+    { key: 'fontAd', type: 'select', label: '廣告大字字型', options: FONT_OPTIONS, group, hint: '報紙廣告的特大字；名片的機構名；信紙的箋紙店號；電報局戳。' },
     { key: 'fontHand', type: 'select', label: '手寫字型', options: FONT_OPTIONS, group, hint: '字型只有在選用時才會下載，而且只下載用到的字。' },
   ] as const;
+}
+
+export interface FontChoice {
+  readonly masthead: string;
+  readonly title: string;
+  readonly body: string;
+  readonly ad: string;
+  readonly hand: string;
+}
+
+/** 表單資料裡的五個字型角色。 */
+export function fontsOf(data: { readonly fontMasthead: string; readonly fontTitle: string; readonly fontBody: string; readonly fontAd: string; readonly fontHand: string }): FontChoice {
+  return { masthead: data.fontMasthead, title: data.fontTitle, body: data.fontBody, ad: data.fontAd, hand: data.fontHand };
 }

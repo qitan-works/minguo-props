@@ -1,11 +1,15 @@
 // 報紙剪報：欄位定義與預設內容。
 
 import { fontFields, paperOptions } from './common.ts';
+import { ERAS, eraPatch } from './eras.ts';
+import { MASTHEAD_LAYOUTS } from '../lib/newspaper/sheetgeom.ts';
+import { PUNCTUATION_MODES } from '../lib/newspaper/punctuation.ts';
 import { conditionDefaults, conditionFields } from './conditions.ts';
 import { CUT_STYLES } from '../lib/cutline.ts';
 import type { DataOf, Field } from './schema.ts';
 
 const CUT = { key: 'fit', in: ['cut'] } as const;
+const FULL = { key: 'fit', in: ['full', 'cut'] } as const;
 
 /**
  * 預設與建議的報頭一律虛構。以下為本專案確認過「不得作為預設」的真實民國報紙名稱，
@@ -42,6 +46,14 @@ export const REAL_NEWSPAPER_NAMES = [
 export const FICTIONAL_MASTHEADS = ['霧港日報', '海隅晚報', '江左異聞報', '滄瀛新報'] as const;
 
 export const newspaperFields = [
+  {
+    key: 'era',
+    type: 'select',
+    label: '年代預設',
+    group: '版面',
+    hint: '一次設定句讀、報頭位置、字型與印刷質感；之後仍可個別調整。',
+    options: ERAS,
+  },
   { key: 'paper', type: 'select', label: '紙張', group: '版面', options: paperOptions(['a4-portrait', 'a4-landscape', 'a5-portrait', 'a5-landscape']) },
   {
     key: 'fit',
@@ -68,7 +80,10 @@ export const newspaperFields = [
     hint: '段數越多，每行字越少。',
     showIf: { key: 'fit', in: ['full', 'cut'] },
   },
-  { key: 'fillSeed', type: 'seed', label: '填版素材', button: '換一批', group: '版面', hint: '在預覽上點一則素材可以鎖定或刪除。', showIf: { key: 'fit', in: ['full', 'cut'] } },
+  { key: 'fillSeed', type: 'seed', label: '填版素材', button: '換一批', group: '版面', hint: '在預覽上點一則素材可以鎖定或刪除。', showIf: FULL },
+  { key: 'layoutSeed', type: 'seed', label: '版面配置', button: '換一個', group: '版面', hint: '區塊的高低寬窄、廣告位置與欄名。', showIf: FULL },
+  { key: 'punctuation', type: 'select', label: '句讀', group: '版面', options: PUNCTUATION_MODES, showIf: FULL },
+  { key: 'mainHorizontal', type: 'checkbox', label: '主新聞標題橫排（由右而左）', group: '版面', showIf: FULL },
   {
     key: 'tiers',
     type: 'select',
@@ -95,6 +110,12 @@ export const newspaperFields = [
   { key: 'cutLeft', type: 'range', label: '左方多留', group: '剪下範圍', min: -10, max: 80, step: 1, unit: 'mm', hint: '負數表示剪進新聞裡。', showIf: CUT },
 
   { key: 'masthead', type: 'text', label: '報頭', group: '報頭', maxLength: 8, hint: '預設為虛構報名，請勿使用真實報紙名稱。', showIf: { key: 'showMasthead', in: [true] } },
+  { key: 'mastheadLayout', type: 'select', label: '報頭位置', group: '報頭', options: MASTHEAD_LAYOUTS, showIf: { key: 'showMasthead', in: [true] } },
+  { key: 'englishName', type: 'text', label: '英文報名', group: '報頭', maxLength: 40, hint: '虛構，例如 THE MIST HARBOUR DAILY。', showIf: { key: 'showMasthead', in: [true] } },
+  { key: 'showLunar', type: 'checkbox', label: '日期附舊曆', group: '報頭', hint: '依香港天文台的公曆農曆對照表換算（1912～1949 年）。' },
+  { key: 'headerStrip', type: 'checkbox', label: '報眉（版面最上方的細欄）', group: '報頭', showIf: FULL },
+  { key: 'sheetLabel', type: 'text', label: '第幾張', group: '報頭', maxLength: 6, showIf: { key: 'headerStrip', in: [true] } },
+  { key: 'pageLabel', type: 'text', label: '第幾版', group: '報頭', maxLength: 6, showIf: { key: 'headerStrip', in: [true] } },
   { key: 'date', type: 'date', label: '出刊日期', group: '報頭', min: '1912-01-01', max: '1949-12-31', hint: '自動換算民國紀年與星期。' },
   { key: 'issue', type: 'text', label: '號數', group: '報頭', maxLength: 16, showIf: { key: 'showMasthead', in: [true] } },
   { key: 'price', type: 'text', label: '售價', group: '報頭', maxLength: 16, showIf: { key: 'showMasthead', in: [true] } },
@@ -111,17 +132,37 @@ export const newspaperFields = [
   { key: 'secondTitle', type: 'text', label: '短訊標題', group: '短訊（可留空）', maxLength: 24 },
   { key: 'secondBody', type: 'textarea', label: '短訊內文', group: '短訊（可留空）', maxLength: 1000, rows: 4 },
 
+  { key: 'press', type: 'range', label: '鉛字質感', group: '印刷與紙色', min: 0, max: 100, step: 5, unit: '%', hint: '字的微小位移與旋轉、墨色深淺、偶爾斷筆、油墨擴散、直行與欄線歪斜、整版微斜。', showIf: FULL },
+  { key: 'showThrough', type: 'range', label: '透背', group: '印刷與紙色', min: 0, max: 100, step: 5, unit: '%', hint: '背面文字淡淡的反向殘影。', showIf: FULL },
+  {
+    key: 'paperTone',
+    type: 'select',
+    label: '紙色',
+    group: '印刷與紙色',
+    options: [
+      { value: 'newsprint', label: '新聞紙（中間淡黃、邊緣氧化黃褐）' },
+      { value: 'aged', label: '一般泛黃' },
+      { value: 'scan', label: '掃描感（灰階、雜點、高對比）' },
+    ],
+    showIf: FULL,
+  },
   ...fontFields('字型'),
   ...conditionFields('紙張狀況', '更多痕跡'),
 ] as const satisfies readonly Field[];
 
 export type NewspaperData = DataOf<typeof newspaperFields>;
 
+const ERA_DEFAULT = eraPatch('1920s');
+
 export const newspaperDefaults: NewspaperData = {
+  era: '1920s',
   paper: 'a4-portrait',
   fit: 'full',
   pageTiers: 5,
   fillSeed: 19281105,
+  layoutSeed: 1105,
+  punctuation: ERA_DEFAULT?.punctuation ?? 'circle',
+  mainHorizontal: true,
   tiers: '3',
   cutStyle: 'scissors',
   cutSeed: 4242,
@@ -134,6 +175,15 @@ export const newspaperDefaults: NewspaperData = {
   showMasthead: true,
   clipEdge: true,
   masthead: '霧港日報',
+  mastheadLayout: ERA_DEFAULT?.mastheadLayout ?? 'right',
+  englishName: 'THE MIST HARBOUR DAILY',
+  showLunar: true,
+  headerStrip: true,
+  sheetLabel: '第一張',
+  pageLabel: '第一版',
+  press: ERA_DEFAULT?.press ?? 55,
+  showThrough: 30,
+  paperTone: 'newsprint',
   date: '1928-11-05',
   issue: '第三千二百一十號',
   price: '每份銅元四枚',
@@ -151,8 +201,10 @@ export const newspaperDefaults: NewspaperData = {
   secondTitle: '港口連日濃霧　輪船誤期',
   secondBody:
     '本埠連日濃霧，自前日黃昏起，港內能見度不及十丈，往來輪船多停泊口外，不敢駛入。據海關報告，昨日進口輪船僅二艘，較平日減少大半。有老船戶謂，此霧色微帶青灰，入夜猶不散，數十年來僅見一次云。',
-  fontTitle: 'noto-serif',
-  fontBody: 'noto-serif',
+  fontMasthead: ERA_DEFAULT?.fontMasthead ?? 'lxgw',
+  fontTitle: ERA_DEFAULT?.fontTitle ?? 'noto-serif',
+  fontBody: ERA_DEFAULT?.fontBody ?? 'noto-serif',
+  fontAd: ERA_DEFAULT?.fontAd ?? 'noto-serif',
   fontHand: 'lxgw',
   ...conditionDefaults({ aging: 'medium', folds: true, foldStyle: 'quarter', stains: true, effectSeed: 73129 }),
 };

@@ -66,6 +66,11 @@ export function woff2Table(file: Buffer, wanted: string): Buffer | null {
 
 /** 解析 cmap 表，回傳有字形的碼位集合（優先使用 format 12，其次 format 4）。 */
 export function parseCmap(cmap: Buffer): Set<number> {
+  return new Set(parseCmapGlyphs(cmap).keys());
+}
+
+/** 解析 cmap 表，回傳「碼位 → 字形編號」（只含有字形的碼位；優先使用 format 12，其次 format 4）。 */
+export function parseCmapGlyphs(cmap: Buffer): Map<number, number> {
   const numTables = cmap.readUInt16BE(2);
   const subtables: { platform: number; encoding: number; offset: number; format: number }[] = [];
   for (let i = 0; i < numTables; i++) {
@@ -77,7 +82,7 @@ export function parseCmap(cmap: Buffer): Set<number> {
     subtables.find((t) => t.format === 12) ??
     subtables.find((t) => t.format === 4 && t.platform === 3) ??
     subtables.find((t) => t.format === 4);
-  const out = new Set<number>();
+  const out = new Map<number, number>();
   if (!pickTable) return out;
   const o = pickTable.offset;
   if (pickTable.format === 12) {
@@ -87,7 +92,7 @@ export function parseCmap(cmap: Buffer): Set<number> {
       const start = cmap.readUInt32BE(q);
       const end = cmap.readUInt32BE(q + 4);
       const glyph = cmap.readUInt32BE(q + 8);
-      for (let c = start; c <= end; c++) if (glyph + (c - start) !== 0) out.add(c);
+      for (let c = start; c <= end; c++) if (glyph + (c - start) !== 0) out.set(c, glyph + (c - start));
     }
     return out;
   }
@@ -109,7 +114,7 @@ export function parseCmap(cmap: Buffer): Set<number> {
         const raw = idx + 1 < cmap.length ? cmap.readUInt16BE(idx) : 0;
         glyph = raw === 0 ? 0 : (raw + delta) & 0xffff;
       }
-      if (glyph !== 0) out.add(c);
+      if (glyph !== 0) out.set(c, glyph);
     }
   }
   return out;

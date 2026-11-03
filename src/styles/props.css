@@ -164,17 +164,34 @@
   font-family: var(--f-hand);
 }
 
+/* 依手寫字型加大直排字距（沒設定時沿用原本的字距） */
+.vt.hand:not(.lt-text),
+.hand .vt {
+  letter-spacing: var(--hand-ls);
+}
+
 /* 標題用「標題字型」 */
 .np-title,
 .np-mh-title,
 .np-second-title,
 .nf-title,
-.nl-title,
-.nl-big,
-.tg-office,
 .tg-form-title,
 .cd-name {
   font-family: var(--f-title);
+}
+
+/* 報頭字型：報紙報頭、電報局名、請帖抬頭 */
+.np-mh-title,
+.tg-office,
+.cd-invite .cd-inv-line:first-child {
+  font-family: var(--f-masthead);
+}
+
+/* 廣告大字字型：名片的機構名、信紙左下角的箋紙店號、電報局戳 */
+.cd-org,
+.lt-stationer,
+.tg-stamp-arc-text {
+  font-family: var(--f-ad);
 }
 
 /* ---------- 報紙剪報 ---------- */
@@ -378,54 +395,120 @@
   font-size: 4.2mm;
 }
 
-/* ---------- 整版報紙 ---------- */
+/* ---------- 整版報紙（第三版：不規則版面） ---------- */
 
 .nf {
-  color: #1b1712;
+  --ink: #17130e;
+  --ink-rgb: 23 19 14;
+  color: var(--ink);
 }
 
-.nf-masthead {
+.tone-scan .nf {
+  --ink: #0d0d0d;
+  --ink-rgb: 13 13 13;
+}
+
+.nf-page {
+  position: absolute;
+  inset: 0;
+  transform-origin: 50% 50%;
+}
+
+/* 油墨擴散：筆畫略粗。用不模糊的文字陰影往四邊各偏一點點；不用 -webkit-text-stroke，
+   因為那會讓 PDF 把每個字轉成外框路徑，檔案大三倍。 */
+.nf-page .nl,
+.nf-page .nf-band,
+.nf-page .nf-adt {
+  text-shadow:
+    var(--spread, 0) 0 0 currentColor,
+    calc(var(--spread, 0) * -1) 0 0 currentColor,
+    0 var(--spread, 0) 0 currentColor;
+}
+
+.nf-header {
   position: absolute;
   display: flex;
   flex-direction: row-reverse;
   justify-content: space-between;
-  align-items: stretch;
-  border-bottom: 1.4mm double #1b1712;
-  padding-bottom: 1.2mm;
+  align-items: center;
+  border-bottom: 0.25mm solid currentColor;
+  letter-spacing: 0.08em;
 }
 
-.nf-masthead .np-mh-side {
-  font-size: 2.8mm;
+.nf-mh {
+  position: absolute;
+  box-shadow:
+    inset 0 0 0 0.5mm currentColor,
+    inset 0 0 0 0.85mm var(--paper-base),
+    inset 0 0 0 1.05mm currentColor;
 }
 
-.nf-title {
-  align-self: center;
+.nf-mh > div {
+  position: absolute;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.nf-mh-title {
+  font-family: var(--f-masthead);
   font-weight: 900;
-  line-height: 1;
+  line-height: 1.04;
+  text-align: center;
+  text-orientation: upright;
+}
+
+.nf-mh-top .nf-mh-title,
+.nf-mh-corner-right .nf-mh-title,
+.nf-mh-corner-left .nf-mh-title {
+  text-align: center;
+  letter-spacing: 0.04em;
+}
+
+.nf-mh-rule {
+  border-top: 0.2mm solid currentColor;
+}
+
+.nf-mh-note {
+  opacity: 0.85;
+  letter-spacing: 0.08em;
+}
+
+.nf-mh-line {
   letter-spacing: 0.06em;
 }
 
-.nf-running {
-  position: absolute;
-  display: flex;
-  align-items: flex-end;
-  justify-content: flex-end;
-  padding-bottom: 0.8mm;
-  border-bottom: 0.6mm solid #1b1712;
-  font-size: 3.2mm;
-  letter-spacing: 0.1em;
+.nf-mh-en {
+  writing-mode: vertical-rl;
+  text-orientation: sideways;
+  font-family: Georgia, 'Times New Roman', serif;
+  letter-spacing: 0.12em;
+  text-align: center;
+}
+
+.nf-mh-en-h {
+  font-family: Georgia, 'Times New Roman', serif;
+  letter-spacing: 0.18em;
+  text-align: center;
+}
+
+.nf-mh-info {
+  text-align: center;
+  letter-spacing: 0.04em;
 }
 
 .nf-frame {
   position: absolute;
-  border-top: 0.5mm solid #1b1712;
-  border-bottom: 0.5mm solid #1b1712;
+  box-shadow:
+    0 0 0 0.45mm currentColor,
+    0 0 0 0.8mm var(--paper-base),
+    0 0 0 0.95mm currentColor;
 }
 
-.nf-rule {
+.nf-rules,
+.nf-framebox {
   position: absolute;
-  height: 0;
-  border-top: 0.25mm solid #1b1712;
+  overflow: visible;
+  pointer-events: none;
 }
 
 .nf-blocks {
@@ -433,28 +516,16 @@
   inset: 0;
 }
 
-.nb {
+/* 同一則新聞的各行只是包起來方便點選，不影響版面 */
+.nf .nb {
+  display: contents;
+}
+
+.nl,
+.nf-band,
+.nf-tag,
+.nf-adt {
   position: absolute;
-  overflow: hidden;
-}
-
-.nb:not(.nb-boxed) {
-  box-shadow: inset 0.2mm 0 0 #1b1712;
-}
-
-.nb-inner {
-  writing-mode: vertical-rl;
-  width: 100%;
-  height: 100%;
-}
-
-.nb-boxed .nb-inner {
-  padding-block: calc(var(--pitch) * 0.5);
-  padding-inline: calc(var(--cell) * 0.5);
-  box-shadow: inset 0 0 0 0.3mm #1b1712;
-}
-
-.nl {
   white-space: nowrap;
   overflow: hidden;
   letter-spacing: 0;
@@ -462,22 +533,163 @@
   text-spacing-trim: space-all;
 }
 
-.nl-title,
-.nl-big {
+.nl {
+  writing-mode: vertical-rl;
+  transform-origin: 50% 0;
+  overflow: visible;
+}
+
+.nl-center {
+  text-align: center;
+}
+
+.nl-h1,
+.nl-h2 {
   font-weight: 900;
 }
 
-.nl-heading {
+.nl-h3 {
   font-weight: 800;
 }
 
-.nl-subtitle {
+.nl-sub {
+  font-weight: 600;
+}
+
+.nf-band-2 {
+  font-family: var(--f-h2);
+}
+
+.nf-band {
+  font-family: var(--f-title);
+  font-weight: 900;
+  direction: rtl;
+  unicode-bidi: bidi-override;
+  text-align: center;
+}
+
+.nf-tag {
+  writing-mode: vertical-rl;
+  text-orientation: upright;
+  background: currentColor;
+  font-family: var(--f-h3, var(--f-title));
+  font-weight: 800;
+  text-align: center;
+  line-height: 1.2;
+}
+
+.nf-tag::first-line {
+  color: var(--paper-base);
+}
+
+.nf-tag {
+  color: var(--ink);
+  -webkit-text-fill-color: var(--paper-base);
+}
+
+/* 每個字一個 span（鉛字質感、圈點）。墨色深淺用帶透明度的顏色而不是 opacity，
+   否則列印成 PDF 時每個字都會變成一個透明群組，檔案大好幾倍。 */
+.gl {
+  display: inline-block;
+  color: rgb(var(--ink-rgb) / var(--a, 1));
+}
+
+.nb-inverted .gl {
+  color: inherit;
+}
+
+/* 舊式圈點：不佔字格，印在字的右側 */
+.pm {
+  position: relative;
+}
+
+/* 句號畫成小圈、頓號畫成短斜點，放在字的右下（落在行與行之間的空隙） */
+.pm::after {
+  content: '';
+  position: absolute;
+  box-sizing: border-box;
+}
+
+.pm[data-pm='。']::after {
+  top: 0.7em;
+  right: -0.17em;
+  width: 0.24em;
+  height: 0.24em;
+  border: 0.055em solid currentColor;
+  border-radius: 50%;
+}
+
+.pm[data-pm='、']::after {
+  top: 0.68em;
+  right: -0.08em;
+  width: 0.07em;
+  height: 0.24em;
+  background: currentColor;
+  border-radius: 0.04em;
+  transform: rotate(-38deg);
+}
+
+/* 偶爾斷筆、缺角 */
+.chip1 {
+  clip-path: polygon(0 0, 100% 0, 100% 58%, 72% 62%, 64% 100%, 0 100%);
+}
+
+.chip2 {
+  clip-path: polygon(0 0, 38% 0, 44% 22%, 100% 18%, 100% 100%, 0 100%);
+}
+
+.chip3 {
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 30% 100%, 26% 84%, 0 80%);
+}
+
+.chip4 {
+  clip-path: polygon(0 0, 100% 0, 100% 44%, 0 52%);
+}
+
+/* 廣告 */
+.nf-adt {
+  font-family: var(--f-body);
+  text-align: center;
+}
+
+.nf-adt-h {
+  direction: rtl;
+  unicode-bidi: bidi-override;
+}
+
+.nf-adt-v {
+  writing-mode: vertical-rl;
+}
+
+.nf-adt-big {
+  font-family: var(--f-ad);
+  font-weight: 900;
+  line-height: 1;
+}
+
+.nf-adt-price {
+  font-family: var(--f-h3, var(--f-title));
   font-weight: 700;
 }
 
-.nb-photo {
-  position: relative;
-  margin-inline-start: 0.4mm;
+.nf-ad-divider {
+  position: absolute;
+  border-top: 0.2mm solid currentColor;
+}
+
+.nf-ad-ink {
+  position: absolute;
+  background: var(--ink);
+}
+
+.nb-inverted .nf-adt,
+.nb-inverted .nf-framebox {
+  color: var(--paper-base);
+}
+
+.nf .nb-photo {
+  display: block;
+  position: absolute;
 }
 
 .nb-photo img {
@@ -496,6 +708,47 @@
   mix-blend-mode: screen;
 }
 
+/* 透背：背面的字左右翻轉、極淡 */
+.nf-ghost {
+  position: absolute;
+  inset: 0;
+  transform: scaleX(-1);
+  color: #2a2016;
+  pointer-events: none;
+}
+
+.nf-ghost-ad {
+  position: absolute;
+  background: rgb(40 30 20 / 0.5);
+}
+
+/* 新聞紙：中間淡黃、邊緣氧化黃褐 */
+.paper.tone-newsprint {
+  --paper-base: #efe3c2;
+  background-image: radial-gradient(ellipse 72% 70% at 50% 48%, #f3e8c9 0%, #ecdcb4 58%, #d9bf86 88%, #c7a464 100%);
+}
+
+/* 掃描感：灰階、高對比 */
+.paper.tone-scan {
+  --paper-base: #e4e3df;
+  background-image: radial-gradient(ellipse 80% 78% at 50% 50%, #ebeae6 0%, #dddcd7 75%, #c9c8c2 100%);
+}
+
+/* 掃描感不用 CSS filter（列印時會把整頁轉成點陣圖），直接改用灰色的色調與紙紋 */
+.paper.tone-scan .age-tone {
+  background:
+    radial-gradient(ellipse 80% 75% at 50% 50%, transparent 55%, rgb(90 90 88 / 0.18) 82%, rgb(60 60 58 / 0.4) 100%),
+    radial-gradient(ellipse 45% 35% at 22% 78%, rgb(110 110 108 / 0.12), transparent 70%);
+}
+
+.paper.tone-scan .age-grain {
+  opacity: 0.95;
+}
+
+.paper.tone-scan .nb-photo img {
+  filter: none;
+}
+
 .sheet--cut > .paper {
   position: absolute;
 }
@@ -505,14 +758,15 @@
     cursor: pointer;
   }
 
-  .nf .nb:hover {
-    outline: 0.4mm solid rgb(140 47 31 / 0.55);
-    outline-offset: -0.4mm;
+  .nf .nb:hover > *,
+  .nf .nb-photo:hover {
+    outline: 0.3mm solid rgb(140 47 31 / 0.55);
+    outline-offset: -0.3mm;
   }
 
-  .nf .nb-locked {
-    outline: 0.5mm dashed rgb(31 70 140 / 0.7);
-    outline-offset: -0.5mm;
+  .nf .nb-locked > * {
+    outline: 0.35mm dashed rgb(31 70 140 / 0.75);
+    outline-offset: -0.35mm;
   }
 }
 
@@ -726,7 +980,7 @@
 
 .tg-stamp text {
   fill: currentColor;
-  font-family: var(--font-serif);
+  font-family: var(--f-ad, var(--font-serif));
   font-weight: 700;
 }
 
@@ -787,7 +1041,7 @@
   color: var(--ink-color);
   font-size: var(--lt-font);
   line-height: var(--pitch);
-  letter-spacing: 0.05em;
+  letter-spacing: calc(0.05em + var(--hand-ls, 0em));
 }
 
 .lt-text p {
@@ -812,7 +1066,7 @@
   left: var(--frame-l);
   top: calc(var(--frame-t) + var(--frame-h) + 3mm);
   color: var(--red);
-  font-family: var(--font-serif);
+  font-family: var(--f-ad, var(--font-serif));
   font-size: 2.6mm;
   letter-spacing: 0.15em;
   opacity: 0.85;

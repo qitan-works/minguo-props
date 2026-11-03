@@ -1,6 +1,6 @@
 // 信箋：欄位定義與預設內容。
 
-import { fontFields, paperOptions } from './common.ts';
+import { fontEraField, fontFields, paperOptions } from './common.ts';
 import { conditionDefaults, conditionFields } from './conditions.ts';
 import type { DataOf, Field } from './schema.ts';
 
@@ -60,6 +60,7 @@ export const letterFields = [
   { key: 'madRewrite', type: 'checkbox', label: '夾雜塗改後重寫', group: '瘋狂手寫', showIf: { key: 'madness', in: MADNESS_ON } },
   { key: 'madRepeat', type: 'checkbox', label: '同一句重複', group: '瘋狂手寫', showIf: { key: 'madness', in: MADNESS_ON } },
   { key: 'madOverflow', type: 'checkbox', label: '字擠出邊界', group: '瘋狂手寫', showIf: { key: 'madness', in: MADNESS_ON } },
+  fontEraField('字型'),
   ...fontFields('字型'),
   ...conditionFields('紙張狀況', '更多痕跡'),
 ] as const satisfies readonly Field[];
@@ -87,8 +88,11 @@ export const letterDefaults: LetterData = {
   madRewrite: false,
   madRepeat: false,
   madOverflow: false,
+  fontEra: 'custom',
+  fontMasthead: 'noto-serif',
   fontTitle: 'noto-serif',
   fontBody: 'noto-serif',
+  fontAd: 'noto-serif',
   fontHand: 'lxgw',
   ...conditionDefaults({ aging: 'light', folds: true, foldStyle: 'thirds', stains: true, effectSeed: 61493 }),
 };

@@ -3,10 +3,10 @@
 // 量出保護區與必毀區的位置之後，才由 src/render/effects.ts 畫上去（見 applyPaperEffects）。
 // 全部用 CSS、SVG 與 canvas 即時產生，不使用任何圖片素材。
 
-import { fontStack } from '../fonts.ts';
+import { fontStack, fontVertical } from '../fonts.ts';
 import type { Polygon } from '../lib/geometry.ts';
 import { mulberry32 } from '../lib/random.ts';
-import { PAPER_SIZES, type PaperKey } from '../props/common.ts';
+import { PAPER_SIZES, type FontChoice, type PaperKey } from '../props/common.ts';
 import type { ConditionData } from '../props/conditions.ts';
 import { h } from '../ui/dom.ts';
 import { registerPaper } from './effects.ts';
@@ -37,8 +37,10 @@ export interface PaperSurfaceOptions {
   /** 自由裁切或「從整版剪下」的外形（紙面座標，公釐）。 */
   readonly crop?: Polygon | null;
   readonly className: string;
-  /** 標題、內文、手寫部分的字型（src/fonts.ts 的 id）。 */
-  readonly fonts?: { readonly title: string; readonly body: string; readonly hand: string };
+  /** 紙紋的顏色：一般泛黃或灰階（掃描感）。 */
+  readonly grain?: 'warm' | 'gray';
+  /** 報頭、標題、內文、廣告大字、手寫部分的字型（src/fonts.ts 的 id）。 */
+  readonly fonts?: FontChoice;
 }
 
 /** 建立紙面（道具本體），回傳紙面與放內容的容器。 */
@@ -47,9 +49,14 @@ export function createPaperSurface(options: PaperSurfaceOptions): { paper: HTMLD
   const level = ['none', 'light', 'medium', 'heavy'].includes(c.aging) ? c.aging : 'none';
   const content = h('div', { class: 'paper-content' });
   if (options.fonts) {
+    content.style.setProperty('--f-masthead', fontStack(options.fonts.masthead, 'title'));
     content.style.setProperty('--f-title', fontStack(options.fonts.title, 'title'));
+    content.style.setProperty('--f-ad', fontStack(options.fonts.ad, 'title'));
     content.style.setProperty('--f-body', fontStack(options.fonts.body, 'body'));
     content.style.setProperty('--f-hand', fontStack(options.fonts.hand, 'hand'));
+    // 有些手寫字型（清松 7、8）直排時上字的長筆畫會碰到下字：加大字距
+    const v = fontVertical(options.fonts.hand);
+    if (v.letterSpacing) content.style.setProperty('--hand-ls', `${v.letterSpacing}em`);
   }
   const paper = h(
     'div',
@@ -61,7 +68,7 @@ export function createPaperSurface(options: PaperSurfaceOptions): { paper: HTMLD
   );
   if (level !== 'none') {
     paper.appendChild(h('div', { class: 'age-layer age-tone', attrs: { 'aria-hidden': 'true' } }));
-    paper.appendChild(grainLayer());
+    paper.appendChild(grainLayer(options.grain ?? 'warm'));
   }
   if (options.roughEdge && c.edge === 'none' && !options.crop) {
     paper.style.setProperty('clip-path', roughEdgePolygon(options.width, options.height, c.effectSeed * 104729 + (options.variant ?? 0)));
@@ -78,14 +85,15 @@ export function createPaperSurface(options: PaperSurfaceOptions): { paper: HTMLD
 }
 
 const GRAIN_SIZE = 256;
-let grainUrl: string | null = null;
+const grainUrls = new Map<string, string>();
 
 /**
  * 紙紋：用 canvas 產生一小塊可無縫重複的雜訊（多層平滑雜訊＋細顆粒），轉成 PNG 後平鋪。
  * 不用 SVG feTurbulence 鋪滿整頁，是因為那會讓瀏覽器把整頁轉成高解析度點陣圖，PDF 會大到十幾 MB。
  */
-function grainTexture(): string | null {
-  if (grainUrl !== null) return grainUrl;
+function grainTexture(kind: 'warm' | 'gray'): string | null {
+  const cached = grainUrls.get(kind);
+  if (cached !== undefined) return cached;
   const canvas = document.createElement('canvas');
   canvas.width = GRAIN_SIZE;
   canvas.height = GRAIN_SIZE;
@@ -123,18 +131,26 @@ function grainTexture(): string | null {
   for (let i = 0; i < n * n; i++) {
     const v = 0.35 * (coarse[i] ?? 0) + 0.3 * (mid[i] ?? 0) + 0.2 * (fine[i] ?? 0) + 0.15 * rand();
     const alpha = Math.max(0, Math.min(1, (v - 0.35) * 1.6));
+    if (kind === 'gray') {
+      // 掃描感：灰階雜訊，外加零星的黑點（掃描與影印留下的雜點）
+      const speck = rand() < 0.0035;
+      img.data[i * 4] = img.data[i * 4 + 1] = img.data[i * 4 + 2] = speck ? 20 : 70;
+      img.data[i * 4 + 3] = speck ? 200 : Math.round(alpha * 120);
+      continue;
+    }
     img.data[i * 4] = 112;
     img.data[i * 4 + 1] = 82;
     img.data[i * 4 + 2] = 38;
     img.data[i * 4 + 3] = Math.round(alpha * 150);
   }
   ctx.putImageData(img, 0, 0);
-  grainUrl = canvas.toDataURL('image/png');
-  return grainUrl;
+  const url = canvas.toDataURL('image/png');
+  grainUrls.set(kind, url);
+  return url;
 }
 
-function grainLayer(): HTMLElement {
-  const url = grainTexture();
+function grainLayer(kind: 'warm' | 'gray'): HTMLElement {
+  const url = grainTexture(kind);
   return h('div', {
     class: 'age-layer age-grain',
     attrs: { 'aria-hidden': 'true' },

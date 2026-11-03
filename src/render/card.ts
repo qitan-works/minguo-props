@@ -1,6 +1,7 @@
 // 名片與請帖：90×54 mm（或直式 54×90 mm），可單張列印或在 A4 上拼版 10 張。
 
 import { formatMonthDay, parseIsoDate, weekdayOf } from '../lib/minguo.ts';
+import { fontsOf } from '../props/common.ts';
 import { toChineseDigits } from '../lib/numerals.ts';
 import type { CardData } from '../props/card.ts';
 import type { PaperKey } from '../props/common.ts';
@@ -47,7 +48,7 @@ function cardSurface(data: CardData, width: number, height: number, index: numbe
     width,
     height,
     conditions: pickConditions(data),
-    fonts: { title: data.fontTitle, body: data.fontBody, hand: data.fontHand },
+    fonts: fontsOf(data),
     variant: index,
     crop,
     className: `cd-paper stock-${data.stock}`,

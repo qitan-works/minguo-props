@@ -1,7 +1,7 @@
 // 信箋：紅格直排信紙（八行箋等），每一行文字正好落在一格紅線之間。
 
 import { formatMinguoDate, formatMonthDay, parseIsoDate } from '../lib/minguo.ts';
-import { PAPER_SIZES, isPaperKey } from '../props/common.ts';
+import { PAPER_SIZES, isPaperKey, fontsOf } from '../props/common.ts';
 import type { LetterData } from '../props/letter.ts';
 import type { Polygon } from '../lib/geometry.ts';
 import { pickConditions } from '../props/conditions.ts';
@@ -36,7 +36,7 @@ export function renderLetter(data: LetterData, crop: Polygon | null = null): HTM
     width: size.width,
     height: size.height,
     conditions: pickConditions(data),
-    fonts: { title: data.fontTitle, body: data.fontBody, hand: data.fontHand },
+    fonts: fontsOf(data),
     crop,
     className: 'lt-paper',
   });

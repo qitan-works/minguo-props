@@ -8,7 +8,7 @@ export interface AgingOptions {
   readonly aging: string;
   readonly folds: boolean;
   readonly stains: boolean;
-  readonly stainSeed: string;
+  readonly effectSeed: number;
 }
 
 export interface FoldLines {
@@ -77,11 +77,11 @@ export function createPaperSurface(options: PaperSurfaceOptions): { paper: HTMLD
     }
   }
   if (options.stains) {
-    const seed = Number.parseInt(options.stainSeed, 10) || 1;
+    const seed = options.effectSeed;
     paper.appendChild(stainLayer(options.width, options.height, seed * 7919 + options.seedOffset));
   }
   if (options.roughEdge) {
-    const seed = (Number.parseInt(options.stainSeed, 10) || 1) * 104729 + options.seedOffset;
+    const seed = options.effectSeed * 104729 + options.seedOffset;
     paper.style.setProperty('clip-path', roughEdgePolygon(options.width, options.height, seed));
     paper.classList.add('rough-edge');
   }

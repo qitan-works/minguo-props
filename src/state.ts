@@ -1,16 +1,18 @@
 // 應用程式狀態與存檔格式（匯出／匯入 JSON、localStorage 都用同一個格式）。純邏輯。
 //
-// 存檔格式（version 1）：
+// 存檔格式（version 2）：
 // {
 //   "format": "minguo-props",
-//   "version": 1,
+//   "version": 2,
 //   "savedAt": "2026-11-05T03:00:00.000Z",
 //   "active": "newspaper",
-//   "props": { "newspaper": {…}, "telegram": {…}, "letter": {…}, "card": {…} }
+//   "props": { "newspaper": {…表單欄位…}, "telegram": {…}, "letter": {…}, "card": {…} },
+//   "extras": { "newspaper": { "items": […], "locked": […], "removed": […], "crop": null, "decorations": […] }, … }
 // }
-// 匯入時只保留已知欄位；型別不符的欄位改用預設值並提示。
+// 匯入時只保留已知欄位；型別不符的欄位改用預設值並提示。第一版（version 1）的存檔可以直接匯入。
 
 import { cardDefaults, cardFields, type CardData } from './props/card.ts';
+import { defaultExtras, sanitizeExtras, type ExtrasState } from './props/extras.ts';
 import { letterDefaults, letterFields, type LetterData } from './props/letter.ts';
 import { newspaperDefaults, newspaperFields, type NewspaperData } from './props/newspaper.ts';
 import type { Field } from './props/schema.ts';
@@ -18,7 +20,7 @@ import { sanitizeRecord } from './props/schema.ts';
 import { telegramDefaults, telegramFields, type TelegramData } from './props/telegram.ts';
 
 export const SAVE_FORMAT = 'minguo-props';
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 /** 匯入檔大小上限（字元數），照片以 data URL 存放，所以留得寬一些。 */
 export const MAX_SAVE_LENGTH = 32 * 1024 * 1024;
 
@@ -42,6 +44,7 @@ export interface PropsState {
 export interface AppState {
   readonly active: PropKind;
   readonly props: PropsState;
+  readonly extras: ExtrasState;
 }
 
 export const PROP_FIELDS: { readonly [K in PropKind]: readonly Field[] } = {
@@ -60,6 +63,7 @@ export function defaultState(): AppState {
       letter: { ...letterDefaults },
       card: { ...cardDefaults },
     },
+    extras: defaultExtras(),
   };
 }
 
@@ -73,6 +77,7 @@ export interface SaveFile {
   readonly savedAt: string;
   readonly active: PropKind;
   readonly props: PropsState;
+  readonly extras: ExtrasState;
 }
 
 export function toSaveFile(state: AppState, now: Date = new Date()): SaveFile {
@@ -82,6 +87,7 @@ export function toSaveFile(state: AppState, now: Date = new Date()): SaveFile {
     savedAt: now.toISOString(),
     active: state.active,
     props: state.props,
+    extras: state.extras,
   };
 }
 
@@ -95,6 +101,17 @@ export type ParseResult =
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/** 第一版存檔的欄位轉換：「污漬位置」選單（'1'～'8'）改成數字種子。 */
+function migrateV1Prop(raw: unknown): unknown {
+  if (!isRecord(raw)) return raw;
+  const out: Record<string, unknown> = { ...raw };
+  if (typeof raw['stainSeed'] === 'string' && /^[1-9]$/.test(raw['stainSeed'])) {
+    out['effectSeed'] = Number(raw['stainSeed']);
+  }
+  delete out['stainSeed'];
+  return out;
 }
 
 export function parseSaveObject(input: unknown): ParseResult {
@@ -114,7 +131,7 @@ export function parseSaveObject(input: unknown): ParseResult {
   if (!isRecord(input['props'])) warnings.push('存檔沒有道具內容，已全部改用預設值。');
 
   function load<D>(kind: PropKind, fields: readonly Field[], defaults: D): D {
-    const raw = rawProps[kind];
+    const raw = version === 1 ? migrateV1Prop(rawProps[kind]) : rawProps[kind];
     if (raw === undefined) return { ...defaults };
     const { data, replaced } = sanitizeRecord(fields, defaults as never, raw);
     if (!isRecord(raw)) warnings.push(`${PROP_LABELS[kind]}的內容格式不符，已改用預設值。`);
@@ -131,11 +148,14 @@ export function parseSaveObject(input: unknown): ParseResult {
     card: load('card', cardFields, cardDefaults),
   };
 
+  const extrasResult = sanitizeExtras(input['extras'], PROP_LABELS);
+  warnings.push(...extrasResult.warnings);
+
   let active: PropKind = 'newspaper';
   if (isPropKind(input['active'])) active = input['active'];
   else if (input['active'] !== undefined) warnings.push('無法辨識存檔中目前的道具種類，已切換到報紙剪報。');
 
-  return { ok: true, state: { active, props }, warnings };
+  return { ok: true, state: { active, props, extras: extrasResult.extras }, warnings };
 }
 
 export function parseSaveText(text: string): ParseResult {
@@ -149,11 +169,12 @@ export function parseSaveText(text: string): ParseResult {
   return parseSaveObject(parsed);
 }
 
-/** 更新某個道具的一個欄位，回傳新的狀態（不修改原狀態）。 */
-export function updateProp<K extends PropKind>(
-  state: AppState,
-  kind: K,
-  patch: Partial<PropsState[K]>,
-): AppState {
+/** 更新某個道具的欄位，回傳新的狀態（不修改原狀態）。 */
+export function updateProp<K extends PropKind>(state: AppState, kind: K, patch: Partial<PropsState[K]>): AppState {
   return { ...state, props: { ...state.props, [kind]: { ...state.props[kind], ...patch } } };
+}
+
+/** 更新某個道具的結構化資料。 */
+export function updateExtras<K extends PropKind>(state: AppState, kind: K, patch: Partial<ExtrasState[K]>): AppState {
+  return { ...state, extras: { ...state.extras, [kind]: { ...state.extras[kind], ...patch } } };
 }

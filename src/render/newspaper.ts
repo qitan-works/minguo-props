@@ -27,7 +27,7 @@ export function renderNewspaper(data: NewspaperData): HTMLElement {
     aging: data.aging,
     folds: data.folds,
     stains: data.stains,
-    stainSeed: data.stainSeed,
+    effectSeed: data.effectSeed,
     foldLines: { horizontal: [0.5], vertical: [0.5] },
     roughEdge: data.clipEdge,
     seedOffset: 11,

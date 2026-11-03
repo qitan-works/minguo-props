@@ -370,3 +370,76 @@ textarea:focus-visible {
     position: static;
   }
 }
+
+/* ---------- 第二版：滑桿、種子、條目編輯、預覽選單 ---------- */
+
+.range-box,
+.seed-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.range-box input[type='range'] {
+  flex: 1;
+}
+
+.range-value,
+.seed-value {
+  min-width: 4.5em;
+  font-size: 0.8rem;
+  color: var(--ui-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.items-editor .item-row {
+  display: grid;
+  gap: 4px;
+  padding: 8px 0;
+  border-top: 1px dashed var(--ui-line);
+}
+
+.items-editor .item-head {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.items-editor input,
+.items-editor select,
+.items-editor textarea {
+  width: 100%;
+  border: 1px solid var(--ui-line);
+  border-radius: 5px;
+  padding: 5px 8px;
+  background: #fffdf9;
+}
+
+.items-editor .item-head select {
+  width: auto;
+  flex: 1;
+}
+
+.preview-stage {
+  position: relative;
+}
+
+.popover {
+  position: absolute;
+  z-index: 20;
+  display: grid;
+  gap: 6px;
+  min-width: 12em;
+  max-width: 22em;
+  padding: 8px 10px;
+  background: var(--ui-panel);
+  border: 1px solid var(--ui-line);
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgb(40 30 15 / 0.25);
+  font-size: 0.85rem;
+}
+
+.popover-title {
+  font-weight: 700;
+}
+.field-label { font-size: 0.9rem; }

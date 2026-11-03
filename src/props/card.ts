@@ -89,5 +89,5 @@ export const cardDefaults: CardData = {
   aging: 'light',
   folds: false,
   stains: false,
-  stainSeed: '2',
+  effectSeed: 52817,
 };

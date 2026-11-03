@@ -83,7 +83,7 @@ export function renderTelegram(data: TelegramData, book: Codebook | null): Teleg
     aging: data.aging,
     folds: data.folds,
     stains: data.stains,
-    stainSeed: data.stainSeed,
+    effectSeed: data.effectSeed,
     foldLines: size.width > size.height ? { horizontal: [], vertical: [0.5] } : { horizontal: [0.5], vertical: [] },
     seedOffset: 23,
     className: 'tg-paper',

@@ -75,5 +75,5 @@ export const letterDefaults: LetterData = {
   aging: 'light',
   folds: true,
   stains: true,
-  stainSeed: '5',
+  effectSeed: 61493,
 };

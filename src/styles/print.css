@@ -103,6 +103,7 @@ html[data-page='card-portrait'] body {
   .editor,
   .overflow-warning,
   .print-tip,
+  .popover,
   .noscript {
     display: none !important;
   }
@@ -123,6 +124,10 @@ html[data-page='card-portrait'] body {
   .sheet-scaler {
     width: auto !important;
     height: auto !important;
+  }
+
+  .nf .nb {
+    outline: none !important;
   }
 
   .sheet-scaler > .sheet {

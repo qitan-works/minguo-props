@@ -6,6 +6,7 @@ import { createCodebook, encodeTelegram, missingChars, substitutedChars, type Co
 import { renderCard } from './render/card.ts';
 import { renderLetter } from './render/letter.ts';
 import { fitNewspaperToContent, renderNewspaper } from './render/newspaper.ts';
+import { renderNewspaperFull, type FullPageRender } from './render/newspaper-full.ts';
 import { findOverflow } from './render/sheet.ts';
 import { renderTelegram, type TelegramRender } from './render/telegram.ts';
 import {
@@ -15,12 +16,15 @@ import {
   defaultState,
   parseSaveText,
   serializeState,
+  updateExtras,
   updateProp,
   type AppState,
   type PropKind,
 } from './state.ts';
 import { h } from './ui/dom.ts';
 import { buildForm, type FieldValue } from './ui/form.ts';
+import { buildItemsEditor } from './ui/items.ts';
+import { closePopover, showPopover } from './ui/popover.ts';
 
 const STORAGE_KEY = 'minguo-props:v1';
 const store = createSafeStore(() => window.localStorage, STORAGE_KEY);
@@ -47,6 +51,7 @@ const els = {
 };
 
 let codebook: Codebook | null = null;
+let lastFull: FullPageRender | null = null;
 let codebookFailed = false;
 let saveTimer: number | undefined;
 let renderQueued = false;
@@ -127,7 +132,7 @@ function switchTo(kind: PropKind): void {
 let refreshForm: ((values: Readonly<Record<string, FieldValue>>) => void) | null = null;
 
 function currentValues(): Readonly<Record<string, FieldValue>> {
-  return state.props[state.active] as Readonly<Record<string, FieldValue>>;
+  return state.props[state.active] as unknown as Readonly<Record<string, FieldValue>>;
 }
 
 function rebuildForm(): void {
@@ -145,6 +150,15 @@ function rebuildForm(): void {
   });
   refreshForm = form.refresh;
   els.form.replaceChildren(form.root);
+  if (kind === 'newspaper') {
+    els.form.appendChild(
+      buildItemsEditor(state.extras.newspaper.items, (items) => {
+        state = updateExtras(state, 'newspaper', { items });
+        queueRender();
+        scheduleSave();
+      }),
+    );
+  }
   els.form.setAttribute('aria-labelledby', `tab-${kind}`);
 }
 
@@ -198,12 +212,21 @@ function renderTelegramInfo(result: TelegramRender | null): void {
 }
 
 function renderPreview(): void {
+  closePopover();
+  lastFull = null;
   let sheet: HTMLElement;
   let telegram: TelegramRender | null = null;
   switch (state.active) {
-    case 'newspaper':
-      sheet = renderNewspaper(state.props.newspaper);
+    case 'newspaper': {
+      const np = state.props.newspaper;
+      if (np.fit === 'full' || np.fit === 'cut') {
+        lastFull = renderNewspaperFull(np, state.extras.newspaper);
+        sheet = lastFull.sheet;
+      } else {
+        sheet = renderNewspaper(np);
+      }
       break;
+    }
     case 'telegram':
       telegram = renderTelegram(state.props.telegram, codebook);
       sheet = telegram.sheet;
@@ -295,7 +318,11 @@ els.resetButton.addEventListener('click', () => {
   const kind = state.active;
   if (!window.confirm(`要把「${PROP_LABELS[kind]}」的內容還原成預設值嗎？`)) return;
   const defaults = defaultState();
-  state = { ...state, props: { ...state.props, [kind]: defaults.props[kind] } };
+  state = {
+    ...state,
+    props: { ...state.props, [kind]: defaults.props[kind] },
+    extras: { ...state.extras, [kind]: defaults.extras[kind] },
+  };
   rebuildForm();
   queueRender();
   scheduleSave();
@@ -311,6 +338,63 @@ els.clearButton.addEventListener('click', () => {
   rebuildForm();
   queueRender();
   setStatus('已清除本機保存的內容。');
+});
+
+// ---- 整版：點一則素材可鎖定或刪除 ----
+
+els.stage.addEventListener('click', (event) => {
+  const target = event.target instanceof Element ? event.target.closest<HTMLElement>('.nb[data-block-id]') : null;
+  if (!target || !lastFull || state.active !== 'newspaper') {
+    closePopover();
+    return;
+  }
+  const id = target.dataset['blockId'] ?? '';
+  const source = target.dataset['source'];
+  const box = els.stage.getBoundingClientRect();
+  const x = event.clientX - box.left + els.stage.scrollLeft;
+  const y = event.clientY - box.top + els.stage.scrollTop;
+  const extras = state.extras.newspaper;
+  const commit = (patch: Parameters<typeof updateExtras<'newspaper'>>[2]): void => {
+    state = updateExtras(state, 'newspaper', patch);
+    queueRender();
+    scheduleSave();
+  };
+  if (source === 'filler') {
+    const baseId = id.split('#')[0] ?? id;
+    const isLocked = extras.locked.some((l) => l.id === baseId);
+    const item = lastFull.pool.byId.get(baseId);
+    showPopover(els.stage, x, y, '填版素材', [
+      isLocked
+        ? { label: '解除鎖定', run: () => commit({ locked: extras.locked.filter((l) => l.id !== baseId) }) }
+        : {
+            label: '鎖定（換一批時保留）',
+            run: () => {
+              if (item) commit({ locked: [...extras.locked, item].slice(-60) });
+              else setStatus('這一行小訊無法鎖定，可以改用「我的新聞與啟事」自己加。', 'warn');
+            },
+          },
+      {
+        label: '刪除這一塊',
+        run: () =>
+          commit({
+            locked: extras.locked.filter((l) => l.id !== baseId),
+            removed: [...extras.removed.filter((r) => r !== baseId), baseId].slice(-500),
+          }),
+      },
+    ]);
+  } else if (id === 'main' || id === 'photo' || id === 'second') {
+    showPopover(els.stage, x, y, '這一則在左邊表單的「新聞」「照片」「短訊」欄位編輯', []);
+  } else {
+    showPopover(els.stage, x, y, '我的新聞與啟事', [
+      {
+        label: '刪除這一則',
+        run: () => {
+          commit({ items: extras.items.filter((i) => i.id !== id) });
+          rebuildForm();
+        },
+      },
+    ]);
+  }
 });
 
 // ---- 啟動 ----

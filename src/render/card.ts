@@ -47,7 +47,7 @@ function cardSurface(data: CardData, width: number, height: number, index: numbe
     aging: data.aging,
     folds: data.folds,
     stains: data.stains,
-    stainSeed: data.stainSeed,
+    effectSeed: data.effectSeed,
     foldLines: width > height ? { horizontal: [], vertical: [0.5] } : { horizontal: [0.5], vertical: [] },
     seedOffset: 53 + index * 17,
     className: `cd-paper stock-${data.stock}`,

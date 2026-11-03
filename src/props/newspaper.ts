@@ -1,7 +1,10 @@
 // 報紙剪報：欄位定義與預設內容。
 
 import { agingFields, paperOptions } from './common.ts';
+import { CUT_STYLES } from '../lib/cutline.ts';
 import type { DataOf, Field } from './schema.ts';
+
+const CUT = { key: 'fit', in: ['cut'] } as const;
 
 /**
  * 預設與建議的報頭一律虛構。以下為本專案確認過「不得作為預設」的真實民國報紙名稱，
@@ -40,6 +43,32 @@ export const FICTIONAL_MASTHEADS = ['霧港日報', '海隅晚報', '江左異�
 export const newspaperFields = [
   { key: 'paper', type: 'select', label: '紙張', group: '版面', options: paperOptions(['a4-portrait', 'a4-landscape', 'a5-portrait', 'a5-landscape']) },
   {
+    key: 'fit',
+    type: 'select',
+    label: '版面模式',
+    group: '版面',
+    hint: '「整版」用填版素材把整張報紙排滿；「從整版剪下」先排滿整版，再沿剪線剪出你的新聞。',
+    options: [
+      { value: 'full', label: '整版（排滿，像一張真的報紙）' },
+      { value: 'cut', label: '從整版剪下（邊緣的字被切成一半）' },
+      { value: 'content', label: '剪報：只有這一則，緊貼文字' },
+      { value: 'page', label: '剪報：只有這一則，填滿紙張' },
+    ],
+  },
+  {
+    key: 'pageTiers',
+    type: 'range',
+    label: '整版分段',
+    group: '版面',
+    min: 3,
+    max: 8,
+    step: 1,
+    unit: '段',
+    hint: '段數越多，每行字越少。',
+    showIf: { key: 'fit', in: ['full', 'cut'] },
+  },
+  { key: 'fillSeed', type: 'seed', label: '填版素材', button: '換一批', group: '版面', hint: '在預覽上點一則素材可以鎖定或刪除。', showIf: { key: 'fit', in: ['full', 'cut'] } },
+  {
     key: 'tiers',
     type: 'select',
     label: '分段',
@@ -50,20 +79,19 @@ export const newspaperFields = [
       { value: '3', label: '三段' },
       { value: '4', label: '四段' },
     ],
+    showIf: { key: 'fit', in: ['content', 'page'] },
   },
-  {
-    key: 'fit',
-    type: 'select',
-    label: '剪報大小',
-    group: '版面',
-    hint: '「貼合內容」會依文章長短把剪報裁成剛好的寬度。',
-    options: [
-      { value: 'content', label: '貼合內容（像剪下來的一則新聞）' },
-      { value: 'page', label: '填滿紙張' },
-    ],
-  },
-  { key: 'showMasthead', type: 'checkbox', label: '顯示報頭（剪下報頭一角）', group: '版面' },
-  { key: 'clipEdge', type: 'checkbox', label: '剪報毛邊', group: '版面' },
+  { key: 'showMasthead', type: 'checkbox', label: '顯示報頭', group: '版面' },
+  { key: 'clipEdge', type: 'checkbox', label: '剪報毛邊', group: '版面', showIf: { key: 'fit', in: ['content', 'page'] } },
+
+  { key: 'cutStyle', type: 'select', label: '剪線', group: '剪下範圍', options: CUT_STYLES, showIf: CUT },
+  { key: 'cutSeed', type: 'seed', label: '剪線形狀', button: '換一個', group: '剪下範圍', showIf: CUT },
+  { key: 'cutAnchor', type: 'select', label: '剪下哪一則', group: '剪下範圍', options: [{ value: 'main', label: '主新聞' }, { value: 'user', label: '我寫的全部新聞與啟事' }], showIf: CUT },
+  { key: 'cutMasthead', type: 'checkbox', label: '連報頭一起剪', group: '剪下範圍', showIf: CUT },
+  { key: 'cutTop', type: 'range', label: '上方多留', group: '剪下範圍', min: -10, max: 80, step: 1, unit: 'mm', showIf: CUT },
+  { key: 'cutRight', type: 'range', label: '右方多留', group: '剪下範圍', min: -10, max: 80, step: 1, unit: 'mm', showIf: CUT },
+  { key: 'cutBottom', type: 'range', label: '下方多留', group: '剪下範圍', min: -10, max: 80, step: 1, unit: 'mm', showIf: CUT },
+  { key: 'cutLeft', type: 'range', label: '左方多留', group: '剪下範圍', min: -10, max: 80, step: 1, unit: 'mm', hint: '負數表示剪進新聞裡。', showIf: CUT },
 
   { key: 'masthead', type: 'text', label: '報頭', group: '報頭', maxLength: 8, hint: '預設為虛構報名，請勿使用真實報紙名稱。', showIf: { key: 'showMasthead', in: [true] } },
   { key: 'date', type: 'date', label: '出刊日期', group: '報頭', min: '1912-01-01', max: '1949-12-31', hint: '自動換算民國紀年與星期。' },
@@ -89,8 +117,18 @@ export type NewspaperData = DataOf<typeof newspaperFields>;
 
 export const newspaperDefaults: NewspaperData = {
   paper: 'a4-portrait',
+  fit: 'full',
+  pageTiers: 5,
+  fillSeed: 19281105,
   tiers: '3',
-  fit: 'content',
+  cutStyle: 'scissors',
+  cutSeed: 4242,
+  cutAnchor: 'main',
+  cutMasthead: false,
+  cutTop: 6,
+  cutRight: 8,
+  cutBottom: 6,
+  cutLeft: 14,
   showMasthead: true,
   clipEdge: true,
   masthead: '霧港日報',
@@ -114,5 +152,5 @@ export const newspaperDefaults: NewspaperData = {
   aging: 'medium',
   folds: true,
   stains: true,
-  stainSeed: '3',
+  effectSeed: 73129,
 };

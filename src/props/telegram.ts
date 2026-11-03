@@ -84,5 +84,5 @@ export const telegramDefaults: TelegramData = {
   aging: 'light',
   folds: true,
   stains: false,
-  stainSeed: '1',
+  effectSeed: 190331,
 };

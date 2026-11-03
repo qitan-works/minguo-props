@@ -33,7 +33,7 @@ export function renderLetter(data: LetterData): HTMLElement {
     aging: data.aging,
     folds: data.folds,
     stains: data.stains,
-    stainSeed: data.stainSeed,
+    effectSeed: data.effectSeed,
     foldLines: { horizontal: [1 / 3, 2 / 3], vertical: [0.5] },
     seedOffset: 37,
     className: 'lt-paper',

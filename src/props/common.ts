@@ -9,17 +9,12 @@ export const AGING_OPTIONS = [
   { value: 'heavy', label: '重度做舊' },
 ] as const satisfies readonly Option[];
 
-export const STAIN_SEED_OPTIONS = ['一', '二', '三', '四', '五', '六', '七', '八'].map((label, i) => ({
-  value: String(i + 1),
-  label: `樣式${label}`,
-})) satisfies readonly Option[];
-
 export function agingFields<G extends string>(group: G) {
   return [
     { key: 'aging', type: 'select', label: '做舊程度', options: AGING_OPTIONS, group },
     { key: 'folds', type: 'checkbox', label: '摺痕', group },
     { key: 'stains', type: 'checkbox', label: '污漬', group },
-    { key: 'stainSeed', type: 'select', label: '污漬位置', options: STAIN_SEED_OPTIONS, group },
+    { key: 'effectSeed', type: 'seed', label: '隨機效果', button: '換一個', hint: '污漬、紙邊等隨機效果的位置；預覽與列印完全相同。', group },
   ] as const;
 }
 

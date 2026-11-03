@@ -978,9 +978,14 @@
   stroke-width: 0.25;
 }
 
-.fx-blur {
+.fx-bleed {
   position: absolute;
   inset: 0;
+  pointer-events: none;
+}
+
+.fx-bleed-text {
+  pointer-events: none;
 }
 
 .fx-sun {

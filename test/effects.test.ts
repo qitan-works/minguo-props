@@ -189,3 +189,60 @@ describe('效果規劃：保護區與必毀區', () => {
     assert.ok(ratio > 0.3 && ratio < 0.7, `保留比例 ${ratio}`);
   });
 });
+
+describe('浸水與火燒（第三版）', () => {
+  const protect: Rect[] = [{ x: 60, y: 120, w: 30, h: 8 }];
+  const base = { width: 210, height: 297, protect, destroy: [], crop: null, variant: 0 } as const;
+
+  it('浸水：有三圈潮線、起皺的紋路避開保護區、墨色偏藍或偏褐', () => {
+    for (const tint of ['blue', 'brown'] as const) {
+      const plan = planEffects({ ...base, settings: settings({ water: 'half', waterStrength: 70, waterTint: tint }) });
+      assert.ok(plan.water);
+      assert.equal(plan.water.tint, tint);
+      assert.equal(plan.water.tides.length, 3);
+      assert.ok(plan.water.wrinkles.length >= 8);
+      for (const w of plan.water.wrinkles) for (const p of w) assert.ok(!protect.some((r) => p.x > r.x && p.x < r.x + r.w && p.y > r.y && p.y < r.y + r.h));
+    }
+    // 舊存檔沒有墨色欄位：偏褐
+    const old = planEffects({ ...base, settings: settings({ water: 'corner', waterStrength: 40 }) });
+    assert.equal(old.water?.tint, 'brown');
+  });
+
+  it('火燒邊由外往內：十圈焦痕由深到淺，都在紙內、不碰保護區，另有灰燼碎片與焦裂', () => {
+    const plan = planEffects({ ...base, protect: [{ x: 12, y: 40, w: 30, h: 10 }], settings: settings({ edge: 'burnt', edgeDepth: 9 }) });
+    const marks = plan.char.edge;
+    assert.ok(marks);
+    assert.equal(marks.bands.length, 10);
+    for (let i = 1; i < marks.bands.length; i++) assert.ok(marks.bands[i]!.depth < marks.bands[i - 1]!.depth);
+    const inside = marks.bands.flatMap((b) => b.line).filter((p) => p.x > 0 && p.x < 210 && p.y > 0 && p.y < 297).length;
+    assert.ok(inside / marks.bands.flatMap((b) => b.line).length > 0.98);
+    for (const b of marks.bands.slice(-6)) for (const p of b.line) assert.ok(!(p.x > 12 && p.x < 42 && p.y > 40 && p.y < 50), '焦痕蓋到保護區');
+    assert.ok(marks.flakes.length > 20 && marks.flakes.some((f) => f.ash) && marks.flakes.some((f) => !f.ash));
+    assert.ok(marks.cracks.length > 5);
+  });
+
+  it('燒洞也有焦痕，往洞外（紙面）擴散', () => {
+    const plan = planEffects({ ...base, settings: settings({ burnHoles: 3 }) });
+    const burns = plan.holes.filter((h) => h.kind === 'burn');
+    assert.equal(plan.char.holes.length, burns.length);
+    for (let i = 0; i < burns.length; i++) {
+      const hole = burns[i]!.polygon;
+      const cx = hole.reduce((s, p) => s + p.x, 0) / hole.length;
+      const cy = hole.reduce((s, p) => s + p.y, 0) / hole.length;
+      const r0 = Math.max(...hole.map((p) => Math.hypot(p.x - cx, p.y - cy)));
+      const outer = plan.char.holes[i]!.bands[0]!.line;
+      const avg = outer.reduce((s, p) => s + Math.hypot(p.x - cx, p.y - cy), 0) / outer.length;
+      assert.ok(avg > r0 * 0.9, '最外圈的焦痕要在洞外');
+    }
+  });
+
+  it('不用 backdrop-filter（列印成 PDF 時不會畫出來，預覽和 PDF 會不一樣）', async () => {
+    const { readdir, readFile } = await import('node:fs/promises');
+    const root = new URL('../src/', import.meta.url);
+    for (const entry of await readdir(root, { recursive: true })) {
+      if (!/\.(ts|css|html)$/.test(entry)) continue;
+      const text = await readFile(new URL(entry, root), 'utf8');
+      assert.equal(/backdrop-filter\s*:|'backdrop-filter'/.test(text), false, entry);
+    }
+  });
+});

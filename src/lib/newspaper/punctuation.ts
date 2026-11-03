@@ -55,10 +55,16 @@ export function applyPunctuation(glyphs: readonly Glyph[], mode: PunctuationMode
 }
 
 /** 標題用：圈點與無標點模式都把標點全部拿掉，現代模式照原文。 */
+/** 標題的裝飾符號（區塊標題樣式加的【】〔〕◎▲）不是標點，各種句讀模式都保留。 */
+const TITLE_ORNAMENTS = new Set(Array.from('【】〔〕◎▲'));
+
 export function headlinePunctuation(text: string, mode: PunctuationMode): string {
   if (mode === 'modern') return text;
-  return Array.from(text)
-    .map((ch) => (isPunctuation(ch) ? (PAUSE.has(ch) || SENTENCE_END.has(ch) ? '　' : '') : ch))
+  const chars = Array.from(text);
+  // 整個標題用「」括起來時（區塊標題樣式），也當成裝飾保留
+  const wrapped = chars[0] === '「' && chars[chars.length - 1] === '」';
+  return chars
+    .map((ch, i) => (TITLE_ORNAMENTS.has(ch) || (wrapped && (i === 0 || i === chars.length - 1)) ? ch : isPunctuation(ch) ? (PAUSE.has(ch) || SENTENCE_END.has(ch) ? '　' : '') : ch))
     .join('')
     .replace(/　{2,}/g, '　')
     .replace(/^　|　$/g, '');

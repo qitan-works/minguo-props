@@ -117,3 +117,32 @@ export function createContent(o: ContentOptions): ContentProvider {
     },
   };
 }
+
+/**
+ * 鎖定區塊時存下它的內容（換一批也不變）：填版素材原樣存下，社論、專電、連載、副刊詩文
+ * 轉成同樣格式的素材。使用者自己寫的內容本來就不會變，不必存。
+ */
+export function snapshotContent(ids: readonly string[], pool: BroadsheetPool, limit = 6): FillerItem[] {
+  const out: FillerItem[] = [];
+  for (const id of ids) {
+    if (out.length >= limit) break;
+    const fromPool = pool.byId.get(id);
+    if (fromPool) {
+      out.push(fromPool);
+      continue;
+    }
+    const e = EDITORIALS.find((x) => x.id === id) ?? LITERARY.find((x) => x.id === id);
+    if (e) {
+      out.push(e);
+      continue;
+    }
+    const w = WIRES.find((x) => x.id === id);
+    if (w) {
+      out.push({ id: w.id, kind: 'short', title: '', body: `【${w.from}電】${w.body}` });
+      continue;
+    }
+    const s = SERIALS.find((x) => x.id === id);
+    if (s) out.push({ id: s.id, kind: 'news', title: s.novel, subtitle: s.chapter, body: s.body });
+  }
+  return out;
+}

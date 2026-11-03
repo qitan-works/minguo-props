@@ -154,6 +154,13 @@ export interface SectionLayout {
 
 const MASTHEAD = -2;
 
+/** 區塊最窄幾行：種類的下限，文字區塊再加上標題直排時佔的寬度。 */
+function minWidth(block: PlannedBlock): number {
+  const base = MIN_WIDTH[block.style.kind];
+  if (!FLOW_KINDS.has(block.style.kind) || block.style.titleDir === 'h') return base;
+  return Math.max(base, TITLE_METRICS[block.style.titleSize].span + 2 + (block.style.frame === 'none' ? 0 : 2));
+}
+
 /** 各種類最窄幾行。 */
 export const MIN_WIDTH: Readonly<Record<BlockKind, number>> = {
   news: 3,
@@ -244,7 +251,7 @@ export function layoutSections(input: SectionInput): SectionLayout {
   };
   const secRows = Math.max(3, Math.floor(R / S) - 1);
   const chooseWidth = (block: PlannedBlock, avail: number): number => {
-    const min = MIN_WIDTH[block.style.kind];
+    const min = minWidth(block);
     let want = block.style.width;
     // 使用者的主新聞與第二則：估算要幾行才排得完（不截斷）
     if ((block.source === 'lead' || block.source === 'second') && want > 0 && FLOW_KINDS.has(block.style.kind)) {
@@ -276,7 +283,7 @@ export function layoutSections(input: SectionInput): SectionLayout {
       continue;
     }
     const avail = run(spot.s, spot.c);
-    if (avail < MIN_WIDTH[block.style.kind]) {
+    if (avail < minWidth(block)) {
       fillGap(spot.s, spot.c, avail);
       dropped.push(block.id);
       continue;
@@ -294,7 +301,7 @@ export function layoutSections(input: SectionInput): SectionLayout {
       const spot = firstFree();
       if (!spot) break;
       const avail = run(spot.s, spot.c);
-      if (avail < MIN_WIDTH[block.style.kind]) {
+      if (avail < minWidth(block)) {
         fillGap(spot.s, spot.c, avail);
         continue;
       }
@@ -478,7 +485,19 @@ function flowBlock(
   let overflow = false;
   let start = 0;
   if (head) {
-    const laid = layoutItem(head, slots, 0, mode, true);
+    // 標題太大放不下時，一級一級縮小，標題一定排在最前面
+    let laid = layoutItem(head, slots, 0, mode, true);
+    for (const size of [3, 4, 5] as const) {
+      if (laid || !head.title) break;
+      if (TITLE_METRICS[size].size >= (head.headline?.size ?? 99)) continue;
+      const smaller: FlowItem = { ...head, headline: TITLE_METRICS[size] };
+      laid = layoutItem(smaller, slots, 0, mode, true);
+      if (laid) {
+        if (items[0] === head) items[0] = smaller;
+        else items.splice(items.indexOf(head), 1, smaller);
+        head = smaller;
+      }
+    }
     if (laid) {
       lines.push(...laid.lines);
       start = laid.used;

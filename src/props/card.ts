@@ -88,8 +88,10 @@ export const cardDefaults: CardData = {
   inviteTime: '下午六時',
   inviteVenue: '霧港聚雲樓',
   inviteHost: '林守仁',
+  fontMasthead: 'noto-serif',
   fontTitle: 'noto-serif',
   fontBody: 'noto-serif',
+  fontAd: 'noto-serif',
   fontHand: 'lxgw',
   ...conditionDefaults({ aging: 'light', folds: false, foldStyle: 'half', stains: false, effectSeed: 52817 }),
 };

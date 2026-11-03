@@ -87,8 +87,10 @@ export const letterDefaults: LetterData = {
   madRewrite: false,
   madRepeat: false,
   madOverflow: false,
+  fontMasthead: 'noto-serif',
   fontTitle: 'noto-serif',
   fontBody: 'noto-serif',
+  fontAd: 'noto-serif',
   fontHand: 'lxgw',
   ...conditionDefaults({ aging: 'light', folds: true, foldStyle: 'thirds', stains: true, effectSeed: 61493 }),
 };

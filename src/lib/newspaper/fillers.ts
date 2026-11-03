@@ -1,7 +1,9 @@
 // 填版素材池：手寫素材（src/data/fillers.ts）＋依種子產生的船期、物價、天氣、啟事與一行小訊。
 // 同一個種子永遠得到同樣的素材與順序；「換一批」就是換種子。
 
-import { ADS, NOTICES, SHORT_NEWS, VOCAB, type FillerItem } from '../../data/fillers.ts';
+import { ADS, BANNER_ADS, FEATURE_NEWS, NOTICES, SHORT_NEWS, VOCAB, type FillerItem } from '../../data/fillers.ts';
+import type { AdItem } from './ads.ts';
+import type { FlowItem } from './flow.ts';
 import { toChineseNumber } from '../numerals.ts';
 import { int, pick, rngFor, shuffle, type Rng } from '../random.ts';
 import type { SourceBlock } from './layout.ts';
@@ -218,7 +220,7 @@ export function buildFillerPool(options: FillerPoolOptions): FillerPool {
   const fillers = [...lockedFirst, ...rest].map(toSource);
 
   const tiny: SourceBlock[] = [];
-  for (let i = 0; i < 80; i++) {
+  for (let i = 0; i < 240; i++) {
     const id = `t${seed.toString(36)}-${i}`;
     if (!removed.has(id)) tiny.push(tinyLine(rngFor(seed, id), id));
   }
@@ -228,4 +230,75 @@ export function buildFillerPool(options: FillerPoolOptions): FillerPool {
 /** 素材總字數（測試用：確認夠排滿兩版）。 */
 export function poolCharCount(pool: FillerPool): number {
   return pool.fillers.reduce((n, b) => n + Array.from((b.title ?? '') + b.body).length, 0);
+}
+
+// ---------- 第三版：不規則版面用的素材池 ----------
+
+const PRICE_RE = /大洋|小洋|銅元|每[瓶盒包罐打套刀擔斤石份]|[元角分]$/;
+const MAKER_RE = /發行|地址|出售|均有|均售|總行|公司$|藥房$|號$|行$|局$|莊$|社$|廠$/;
+
+/** 素材（或鎖定時存下的內容）轉成廣告：第一個像價目的一行當價目，像店名地址的一行當發行所。 */
+export function adFromFiller(item: FillerItem, source: 'user' | 'filler' = 'filler'): AdItem {
+  const lines = item.body.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  let price = item.price;
+  let maker = item.maker;
+  const rest: string[] = [];
+  for (const line of lines) {
+    if (!price && PRICE_RE.test(line)) price = line;
+    else if (!maker && MAKER_RE.test(line)) maker = line;
+    else rest.push(line);
+  }
+  return { id: item.id, source, big: item.title, lines: rest, ...(price ? { price } : {}), ...(maker ? { maker } : {}) };
+}
+
+/** 素材轉成文字流排的一則。 */
+export function flowFromFiller(item: FillerItem, source: 'user' | 'filler' = 'filler', level?: 1 | 2 | 3): FlowItem {
+  const paragraphs = item.body.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  return {
+    id: item.id,
+    source,
+    level: level ?? (item.kind === 'news' ? 2 : 3),
+    title: item.title,
+    subtitles: (item.subtitle ?? '').split(/[　 ]+/).filter(Boolean),
+    paragraphs,
+    ...(item.kind === 'list' ? { rows: true } : {}),
+  };
+}
+
+function bannerToFiller(b: (typeof BANNER_ADS)[number]): FillerItem {
+  return { id: b.id, kind: 'ad', title: b.big, body: b.lines.join('\n'), ...(b.price ? { price: b.price } : {}), ...(b.maker ? { maker: b.maker } : {}) };
+}
+
+export interface BroadsheetPool {
+  /** 文字素材（鎖定的在最前面）。 */
+  readonly items: readonly FlowItem[];
+  readonly ads: readonly AdItem[];
+  readonly tiny: readonly FlowItem[];
+  readonly byId: ReadonlyMap<string, FillerItem>;
+}
+
+/** 不規則版面用的素材池：同一種子永遠相同；鎖定的排最前面、刪除的不出現。 */
+export function buildBroadsheetPool(options: FillerPoolOptions): BroadsheetPool {
+  const base = buildFillerPool(options);
+  const removed = new Set(options.removed ?? []);
+  const lockedIds = new Set((options.locked ?? []).map((l) => l.id));
+  const byId = new Map(base.byId);
+  const banners = BANNER_ADS.map(bannerToFiller);
+  for (const item of [...FEATURE_NEWS, ...banners]) if (!byId.has(item.id)) byId.set(item.id, item);
+  for (const item of options.locked ?? []) byId.set(item.id, item);
+
+  const rng = rngFor(options.seed, 'broadsheet-order');
+  const fresh = (items: readonly FillerItem[]): FillerItem[] => items.filter((i) => !removed.has(i.id) && !lockedIds.has(i.id));
+  const locked = (options.locked ?? []).filter((i) => !removed.has(i.id));
+
+  const textSources = [...base.fillers.map((b) => byId.get(b.id)).filter((i): i is FillerItem => !!i && i.kind !== 'ad'), ...fresh(FEATURE_NEWS)];
+  const textRest = shuffle(rng, textSources.filter((i) => !lockedIds.has(i.id)));
+  const items = [...locked.filter((i) => i.kind !== 'ad'), ...textRest].map((i) => flowFromFiller(i, 'filler', i.kind === 'short' && rng() < 0.22 ? 2 : undefined));
+
+  const adSources = [...base.fillers.map((b) => byId.get(b.id)).filter((i): i is FillerItem => !!i && i.kind === 'ad'), ...fresh(banners)];
+  const adRest = shuffle(rng, adSources.filter((i) => !lockedIds.has(i.id)));
+  const ads = [...locked.filter((i) => i.kind === 'ad'), ...adRest].map((i) => adFromFiller(i));
+
+  const tiny = base.tiny.map((t) => ({ id: t.id, source: 'filler' as const, level: 3 as const, title: '', subtitles: [], paragraphs: [t.body] }));
+  return { items, ads, tiny, byId };
 }

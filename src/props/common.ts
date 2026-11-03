@@ -47,11 +47,26 @@ export function isPaperKey(value: string): value is PaperKey {
   return Object.prototype.hasOwnProperty.call(PAPER_SIZES, value);
 }
 
-/** 每個道具的標題、內文、手寫部分可分別選字型。 */
+/** 每個道具的報頭、標題、內文、廣告大字、手寫部分可分別選字型。 */
 export function fontFields<G extends string>(group: G) {
   return [
+    { key: 'fontMasthead', type: 'select', label: '報頭字型', options: FONT_OPTIONS, group },
     { key: 'fontTitle', type: 'select', label: '標題字型', options: FONT_OPTIONS, group },
     { key: 'fontBody', type: 'select', label: '內文字型', options: FONT_OPTIONS, group },
+    { key: 'fontAd', type: 'select', label: '廣告大字字型', options: FONT_OPTIONS, group },
     { key: 'fontHand', type: 'select', label: '手寫字型', options: FONT_OPTIONS, group, hint: '字型只有在選用時才會下載，而且只下載用到的字。' },
   ] as const;
+}
+
+export interface FontChoice {
+  readonly masthead: string;
+  readonly title: string;
+  readonly body: string;
+  readonly ad: string;
+  readonly hand: string;
+}
+
+/** 表單資料裡的五個字型角色。 */
+export function fontsOf(data: { readonly fontMasthead: string; readonly fontTitle: string; readonly fontBody: string; readonly fontAd: string; readonly fontHand: string }): FontChoice {
+  return { masthead: data.fontMasthead, title: data.fontTitle, body: data.fontBody, ad: data.fontAd, hand: data.fontHand };
 }

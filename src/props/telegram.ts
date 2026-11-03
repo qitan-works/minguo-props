@@ -83,8 +83,10 @@ export const telegramDefaults: TelegramData = {
   yunmuAlternate: false,
   dropPunctuation: true,
   codeDisplay: 'both',
+  fontMasthead: 'noto-serif',
   fontTitle: 'noto-serif',
   fontBody: 'noto-serif',
+  fontAd: 'noto-serif',
   fontHand: 'lxgw',
   ...conditionDefaults({ aging: 'light', folds: true, foldStyle: 'half', stains: false, effectSeed: 190331 }),
 };

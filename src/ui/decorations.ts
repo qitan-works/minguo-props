@@ -115,7 +115,7 @@ export function buildDecorationEditor(o: DecorationEditorOptions): HTMLElement {
     'fieldset',
     { class: 'form-group' },
     h('legend', { text: '裝飾' }),
-    h('p', { class: 'form-hint', text: '加到紙上後，可在預覽上拖曳移動；滑鼠滾輪縮放，Shift＋滾輪旋轉。' }),
+    h('p', { class: 'form-hint', text: '加到紙上後，可在預覽上拖曳移動；按住 Alt 再捲動滑鼠滾輪縮放，Alt＋Shift＋滾輪旋轉（沒按 Alt 時滾輪照常捲動）。' }),
     h('div', { class: 'deco-add' }, type, add),
     list,
   );

@@ -13,6 +13,7 @@ import { buildDecorationEditor } from './ui/decorations.ts';
 import { placeDecoration } from './lib/decorations.ts';
 import { measureMarks } from './render/effects.ts';
 import { PX_PER_MM } from './lib/geometry.ts';
+import { parsePreviewZoom, previewScale, serializePreviewZoom, wheelDirection, zoomBy, type PreviewFit, type PreviewZoom, type Size } from './lib/preview.ts';
 import { applyPreset, pickConditions } from './props/conditions.ts';
 import { eraFontPatch, eraPatch, isEra } from './props/eras.ts';
 import { startCropDrawing, type CropSession, type CropTool } from './ui/crop.ts';
@@ -52,6 +53,11 @@ const els = {
   overflow: $('#overflow-warning'),
   status: $('#status'),
   stage: $('#preview-stage'),
+  preview: $('#preview'),
+  editor: $('#editor'),
+  previewBar: $('#preview-bar'),
+  zoomValue: $('#zoom-value'),
+  jumpButton: $('#btn-jump'),
   printButton: $('#btn-print'),
   exportButton: $('#btn-export'),
   importButton: $('#btn-import'),
@@ -383,25 +389,76 @@ function renderPreview(): void {
   renderTelegramInfo(telegram);
   requestAnimationFrame(() => {
     els.overflow.hidden = !findOverflow(sheet);
+    fitPreview();
   });
+}
+
+// ---- 預覽大小：整張（預設）、符合寬度、實際大小、放大縮小；選擇存在 localStorage ----
+
+const PREVIEW_ZOOM_KEY = 'minguo-props:preview-zoom';
+const zoomStore = createSafeStore(() => window.localStorage, PREVIEW_ZOOM_KEY);
+let previewZoom: PreviewZoom = parsePreviewZoom(zoomStore.load());
+let currentScale = 1;
+const wideLayout = window.matchMedia('(min-width: 900px)');
+
+/** 道具可用的空間：寬螢幕是預覽欄扣掉工具列、提示與留白；窄螢幕以視窗高度為準。 */
+function previewSpace(): Size {
+  const w = els.stage.clientWidth - 32;
+  if (wideLayout.matches) {
+    const top = els.stage.getBoundingClientRect().top - els.preview.getBoundingClientRect().top + els.preview.scrollTop;
+    return { w, h: els.preview.clientHeight - top - 32 };
+  }
+  return { w, h: window.innerHeight - els.previewBar.offsetHeight - 48 };
 }
 
 function fitPreview(): void {
   const scaler = els.stage.querySelector<HTMLElement>('.sheet-scaler');
   const sheet = scaler?.querySelector<HTMLElement>('.sheet');
   if (!scaler || !sheet) return;
-  const available = els.stage.clientWidth - 32;
-  const naturalW = sheet.offsetWidth;
-  const naturalH = sheet.offsetHeight;
-  if (naturalW === 0) return;
-  const maxScale = naturalW < 400 ? 2.5 : 1;
-  const scale = Math.max(0.2, Math.min(maxScale, available / naturalW));
-  scaler.style.setProperty('--scale', String(scale));
-  scaler.style.setProperty('width', `${naturalW * scale}px`);
-  scaler.style.setProperty('height', `${naturalH * scale}px`);
+  const natural = { w: sheet.offsetWidth, h: sheet.offsetHeight };
+  if (natural.w === 0) return;
+  currentScale = previewScale(previewZoom, natural, previewSpace());
+  scaler.style.setProperty('--scale', String(currentScale));
+  scaler.style.setProperty('width', `${natural.w * currentScale}px`);
+  scaler.style.setProperty('height', `${natural.h * currentScale}px`);
+  els.zoomValue.textContent = `${Math.round(currentScale * 100)}%`;
+  for (const b of els.previewBar.querySelectorAll<HTMLButtonElement>('[data-fit]')) {
+    b.setAttribute('aria-pressed', String(b.dataset['fit'] === previewZoom.fit));
+  }
 }
 
-new ResizeObserver(() => fitPreview()).observe(els.stage);
+function setPreviewZoom(z: PreviewZoom): void {
+  previewZoom = z;
+  zoomStore.save(serializePreviewZoom(z));
+  fitPreview();
+}
+
+els.previewBar.addEventListener('click', (event) => {
+  const button = event.target instanceof Element ? event.target.closest<HTMLButtonElement>('button') : null;
+  if (!button) return;
+  const fit = button.dataset['fit'];
+  if (fit) setPreviewZoom({ fit: fit as PreviewFit, zoom: currentScale });
+  else if (button.dataset['zoom']) setPreviewZoom(zoomBy(currentScale, button.dataset['zoom'] === '1' ? 1 : -1));
+});
+
+const previewResize = new ResizeObserver(() => fitPreview());
+previewResize.observe(els.stage);
+previewResize.observe(els.preview);
+window.addEventListener('resize', () => fitPreview());
+
+// 窄螢幕：浮動按鈕在表單與預覽之間跳轉
+function updateJumpButton(): void {
+  const atPreview = els.preview.getBoundingClientRect().top < window.innerHeight * 0.5;
+  els.jumpButton.textContent = atPreview ? '回表單' : '看預覽';
+  els.jumpButton.setAttribute('aria-controls', atPreview ? 'editor' : 'preview');
+}
+els.jumpButton.addEventListener('click', () => {
+  const target = els.preview.getBoundingClientRect().top < window.innerHeight * 0.5 ? els.editor : els.preview;
+  target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  target.focus({ preventScroll: true });
+});
+window.addEventListener('scroll', updateJumpButton, { passive: true });
+updateJumpButton();
 
 // ---- 工具列 ----
 
@@ -468,6 +525,8 @@ els.clearButton.addEventListener('click', () => {
   if (!window.confirm('要清除這台電腦上保存的全部內容，並還原成預設值嗎？（已匯出的 JSON 檔不受影響）')) return;
   window.clearTimeout(saveTimer);
   store.remove();
+  zoomStore.remove();
+  previewZoom = parsePreviewZoom(null);
   state = defaultState();
   lastSaveOutcome = null;
   renderTabs();
@@ -534,7 +593,7 @@ els.stage.addEventListener('click', (event) => {
   }
 });
 
-// ---- 裝飾：拖曳移動、滾輪縮放、Shift＋滾輪旋轉 ----
+// ---- 裝飾：拖曳移動、Alt＋滾輪縮放、Alt＋Shift＋滾輪旋轉（沒按 Alt 時滾輪一律捲動） ----
 
 function decoTarget(event: Event): { g: SVGGElement; id: string; paper: HTMLElement } | null {
   const g = event.target instanceof Element ? event.target.closest<SVGGElement>('g.deco[data-deco-id]') : null;
@@ -585,10 +644,12 @@ els.stage.addEventListener('pointerdown', (event) => {
 els.stage.addEventListener(
   'wheel',
   (event) => {
+    if (!event.altKey) return;
     const hit = decoTarget(event);
     if (!hit) return;
     event.preventDefault();
-    const dir = event.deltaY > 0 ? -1 : 1;
+    const dir = wheelDirection(event.deltaY, event.deltaX);
+    if (dir === 0) return;
     if (event.shiftKey) patchDecoration(hit.id, (d) => ({ rotate: Math.max(-180, Math.min(180, d.rotate + dir * 5)) }));
     else patchDecoration(hit.id, (d) => ({ scale: Math.max(0.2, Math.min(4, d.scale * (dir > 0 ? 1.06 : 1 / 1.06))) }));
   },

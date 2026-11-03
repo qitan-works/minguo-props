@@ -101,6 +101,8 @@ html[data-page='card-portrait'] body {
 
   .app-header,
   .editor,
+  .preview-bar,
+  .jump-button,
   .overflow-warning,
   .print-tip,
   .popover,
@@ -110,11 +112,20 @@ html[data-page='card-portrait'] body {
     display: none !important;
   }
 
+  /* 螢幕上兩欄各自捲動；列印時還原成一般的文件流，結果和以前相同 */
+  html,
+  body {
+    display: block;
+    height: auto;
+    overflow: visible;
+  }
+
   .workspace,
   .preview,
   .preview-stage {
     display: block;
     position: static;
+    height: auto;
     min-height: 0;
     margin: 0;
     padding: 0;

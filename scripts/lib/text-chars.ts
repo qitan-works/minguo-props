@@ -159,7 +159,7 @@ export function htmlText(source: string): string {
   return source.replace(/<!--[\s\S]*?-->/g, '');
 }
 
-/** 字串裡的非 ASCII 字元（不含換行、BOM 與變體選擇符以外的控制字元）。 */
+/** 字串裡的非 ASCII 字元（略過位元組順序記號 U+FEFF）。 */
 export function nonAsciiChars(text: string): Set<string> {
   const out = new Set<string>();
   for (const ch of text) {

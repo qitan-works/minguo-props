@@ -112,15 +112,6 @@ export function parseName(name: Buffer): NameRecord[] {
   return out;
 }
 
-/** 取某個 nameID 的字串：優先 Windows 英文（0x409），其次任何可解碼的紀錄。 */
-export function nameString(records: readonly NameRecord[], nameID: number, languageID = 0x409): string | null {
-  const pick =
-    records.find((r) => r.nameID === nameID && r.platformID === 3 && r.languageID === languageID && r.value !== null) ??
-    records.find((r) => r.nameID === nameID && r.platformID === 3 && r.value !== null) ??
-    records.find((r) => r.nameID === nameID && r.value !== null);
-  return pick?.value ?? null;
-}
-
 /** 一筆 Windows Unicode 平台（platformID 3、encodingID 1，UTF-16BE）的 name 紀錄。 */
 export function windowsNameRecord(languageID: number, nameID: number, value: string): NameRecord {
   const raw = Buffer.from(value, 'utf16le');

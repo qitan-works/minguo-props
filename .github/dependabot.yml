@@ -8,6 +8,12 @@ updates:
     cooldown:
       default-days: 7
     open-pull-requests-limit: 5
+    ignore:
+      # @types/node 的主版本必須和執行環境的 Node.js 主版本一致（本專案是 Node 24，見 package.json 的 engines
+      # 與 CI 的 setup-node）。型別升到 25 會讓 TypeScript 以為可以用 Node 25 才有的 API，
+      # 程式在 Node 24 上執行時才出錯，所以只接受 24.x 的次版本與修補版本，主版本跟著 Node 一起手動升級。
+      - dependency-name: '@types/node'
+        update-types: ['version-update:semver-major']
 
   - package-ecosystem: github-actions
     directory: /

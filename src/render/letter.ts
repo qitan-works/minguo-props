@@ -6,7 +6,9 @@ import type { LetterData } from '../props/letter.ts';
 import type { Polygon } from '../lib/geometry.ts';
 import { pickConditions } from '../props/conditions.ts';
 import { h, paragraphs } from '../ui/dom.ts';
-import { fillMarked } from '../ui/marked.ts';
+import { charJitter, madText } from '../lib/madness.ts';
+import { hasMarkup, stripMarkup } from '../lib/markup.ts';
+import { fillMarked, fillMarkedMad } from '../ui/marked.ts';
 import { createPaperSurface, createSheet } from './sheet.ts';
 
 export function letterDateText(data: LetterData): string {
@@ -55,10 +57,29 @@ export function renderLetter(data: LetterData, crop: Polygon | null = null): HTM
 
   content.appendChild(h('div', { class: 'lt-frame', attrs: { 'aria-hidden': 'true' } }));
 
-  const text = h('div', { class: 'lt-text vt hand', attrs: { 'data-fit': '' } });
+  const text = h('div', {
+    class: ['lt-text', 'vt', 'hand', data.madness > 0 && data.madOverflow && 'lt-overflow'],
+    attrs: { 'data-fit': data.madness > 0 && data.madOverflow ? null : '' },
+  });
   if (data.salutation) text.appendChild(fillMarked(h('p', { class: 'lt-salutation' }), data.salutation));
-  for (const para of paragraphs(data.body)) {
-    text.appendChild(fillMarked(h('p', { class: ['lt-p', data.indent && 'lt-indent'] }), para));
+  const mad = { strength: data.madness, start: data.madStart, seed: data.effectSeed };
+  if (data.madness > 0) {
+    // 越寫越亂：塗改、重複的句子先寫進文字，再逐字套上偏移
+    const bodyParas = paragraphs(data.body);
+    const total = bodyParas.reduce((n, para) => n + Array.from(stripMarkup(para)).length, 0) + 40;
+    let index = 0;
+    bodyParas.forEach((para, k) => {
+      const plain = !hasMarkup(para);
+      const localStart = Math.max(0, data.madStart - index);
+      const written = plain && (data.madRewrite || data.madRepeat) ? madText(para, { start: localStart, seed: data.effectSeed + k, rewrite: data.madRewrite, repeat: data.madRepeat }) : para;
+      const p = h('p', { class: ['lt-p', data.indent && 'lt-indent', data.madOverflow && k === bodyParas.length - 1 && 'mad-overflow'] });
+      index = fillMarkedMad(p, written, index, (i) => charJitter(i, total, mad));
+      text.appendChild(p);
+    });
+  } else {
+    for (const para of paragraphs(data.body)) {
+      text.appendChild(fillMarked(h('p', { class: ['lt-p', data.indent && 'lt-indent'] }), para));
+    }
   }
   paragraphs(data.closing).forEach((line, i) => {
     text.appendChild(fillMarked(h('p', { class: ['lt-closing', i === 0 ? 'lt-closing-first' : 'lt-closing-raise'] }), line));

@@ -1,5 +1,6 @@
 // 把含文字層標記的文字畫成 DOM（只用 textContent，不用 innerHTML）。
 
+import type { CharJitter } from '../lib/madness.ts';
 import { parseMarkup, type MarkKind, type Segment } from '../lib/markup.ts';
 import { h } from './dom.ts';
 
@@ -60,4 +61,34 @@ export function fillMarkedLine(el: HTMLElement, text: string, marks: readonly (M
   });
   flush();
   return el;
+}
+
+/** 每個字套上「越寫越亂」的偏移；回傳下一個字的序號（跨段落連續計數）。 */
+export function fillMarkedMad(el: HTMLElement, text: string, index: number, jitter: (i: number) => CharJitter | null): number {
+  let i = index;
+  const madChar = (ch: string): Node => {
+    const j = jitter(i++);
+    if (!j) return document.createTextNode(ch);
+    return h('span', {
+      class: 'mad',
+      text: ch,
+      style: {
+        transform: `translate(${j.dx.toFixed(3)}em, ${j.dy.toFixed(3)}em) rotate(${j.rotate.toFixed(1)}deg) scale(${j.scale.toFixed(3)})`,
+        opacity: j.ink.toFixed(2),
+      },
+    });
+  };
+  for (const seg of parseMarkup(text)) {
+    if (!seg.mark) {
+      for (const ch of seg.text) el.appendChild(madChar(ch));
+    } else if (seg.mark === 'rewrite' || seg.mark === 'cutoff') {
+      el.appendChild(markedSpan(seg.mark, seg.text, seg.replacement));
+      i += Array.from(seg.text + (seg.replacement ?? '')).length;
+    } else {
+      const span = h('span', { class: ['mk', `mk-${seg.mark}`], dataset: { mark: seg.mark } });
+      for (const ch of seg.text) span.appendChild(madChar(ch));
+      el.appendChild(span);
+    }
+  }
+  return i;
 }

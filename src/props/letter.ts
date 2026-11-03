@@ -4,6 +4,9 @@ import { fontFields, paperOptions } from './common.ts';
 import { conditionDefaults, conditionFields } from './conditions.ts';
 import type { DataOf, Field } from './schema.ts';
 
+/** 強度大於 0 時才顯示的選項（showIf 只能比對固定值，所以列出所有非 0 的刻度）。 */
+const MADNESS_ON = Array.from({ length: 20 }, (_, i) => (i + 1) * 5);
+
 export const letterFields = [
   { key: 'paper', type: 'select', label: '紙張', group: '信紙', options: paperOptions(['a4-portrait', 'a5-portrait']) },
   {
@@ -52,6 +55,11 @@ export const letterFields = [
   { key: 'date', type: 'date', label: '日期', group: '內容', min: '1912-01-01', max: '1949-12-31', showIf: { key: 'dateMode', in: ['year', 'minguo', 'monthday'] } },
   { key: 'dayStyle', type: 'checkbox', label: '日期用「廿」「卅」', group: '內容', showIf: { key: 'dateMode', in: ['year', 'minguo', 'monthday'] } },
 
+  { key: 'madness', type: 'range', label: '越寫越亂', group: '瘋狂手寫', min: 0, max: 100, step: 5, unit: '%', hint: '每個字隨機偏移、旋轉、縮放、筆壓深淺，越往後越亂。' },
+  { key: 'madStart', type: 'range', label: '從第幾個字開始', group: '瘋狂手寫', min: 0, max: 600, step: 5, unit: '字', showIf: { key: 'madness', in: MADNESS_ON } },
+  { key: 'madRewrite', type: 'checkbox', label: '夾雜塗改後重寫', group: '瘋狂手寫', showIf: { key: 'madness', in: MADNESS_ON } },
+  { key: 'madRepeat', type: 'checkbox', label: '同一句重複', group: '瘋狂手寫', showIf: { key: 'madness', in: MADNESS_ON } },
+  { key: 'madOverflow', type: 'checkbox', label: '字擠出邊界', group: '瘋狂手寫', showIf: { key: 'madness', in: MADNESS_ON } },
   ...fontFields('字型'),
   ...conditionFields('紙張狀況', '更多痕跡'),
 ] as const satisfies readonly Field[];
@@ -74,6 +82,11 @@ export const letterDefaults: LetterData = {
   dateMode: 'year',
   date: '1928-11-05',
   dayStyle: false,
+  madness: 0,
+  madStart: 40,
+  madRewrite: false,
+  madRepeat: false,
+  madOverflow: false,
   fontTitle: 'noto-serif',
   fontBody: 'noto-serif',
   fontHand: 'lxgw',

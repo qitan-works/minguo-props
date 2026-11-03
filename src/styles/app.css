@@ -486,3 +486,44 @@ textarea:focus-visible {
   border: 1px solid var(--ui-line);
   font-size: 0.85rem;
 }
+
+.deco-add {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.deco-add select {
+  flex: 1;
+}
+
+.deco-row {
+  display: grid;
+  gap: 2px;
+  padding: 6px 0;
+  border-top: 1px dashed var(--ui-line);
+}
+
+.deco-row-selected {
+  background: rgb(31 90 160 / 0.06);
+}
+
+.deco-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+
+.deco-head strong {
+  flex: 1 0 100%;
+  font-size: 0.9rem;
+}
+
+.deco-slider {
+  display: grid;
+  grid-template-columns: 4em 1fr 4em;
+  gap: 6px;
+  align-items: center;
+  font-size: 0.85rem;
+}

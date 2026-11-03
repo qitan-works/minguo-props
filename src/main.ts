@@ -8,8 +8,12 @@ import { renderLetter } from './render/letter.ts';
 import { fitNewspaperToContent, renderNewspaper } from './render/newspaper.ts';
 import { renderNewspaperFull, type FullPageRender } from './render/newspaper-full.ts';
 import { applyPaperEffects } from './render/effects.ts';
+import { drawDecorations } from './render/decorations.ts';
+import { buildDecorationEditor } from './ui/decorations.ts';
+import { PX_PER_MM } from './lib/geometry.ts';
 import { applyPreset, pickConditions } from './props/conditions.ts';
 import { startCropDrawing, type CropSession, type CropTool } from './ui/crop.ts';
+import type { Decoration } from './props/extras.ts';
 import { findOverflow } from './render/sheet.ts';
 import { renderTelegram, type TelegramRender } from './render/telegram.ts';
 import {
@@ -55,6 +59,7 @@ const els = {
 
 let codebook: Codebook | null = null;
 let lastFull: FullPageRender | null = null;
+let selectedDeco: string | null = null;
 let codebookFailed = false;
 let saveTimer: number | undefined;
 let renderQueued = false;
@@ -162,6 +167,27 @@ function rebuildForm(): void {
   refreshForm = form.refresh;
   els.form.replaceChildren(form.root);
   els.form.appendChild(cropEditor(kind));
+  els.form.appendChild(
+    buildDecorationEditor({
+      decorations: state.extras[kind].decorations,
+      selectedId: selectedDeco,
+      center: () => {
+        const paper = els.stage.querySelector<HTMLElement>('.paper');
+        return paper ? { x: paper.offsetWidth / PX_PER_MM / 2, y: paper.offsetHeight / PX_PER_MM / 2 } : { x: 50, y: 50 };
+      },
+      onChange(decorations, redraw) {
+        state = updateExtras(state, kind, { decorations } as never);
+        queueRender();
+        scheduleSave();
+        if (redraw) rebuildForm();
+      },
+      onSelect(id) {
+        if (id === selectedDeco) return;
+        selectedDeco = id;
+        queueRender();
+      },
+    }),
+  );
   if (kind === 'newspaper') {
     els.form.appendChild(
       buildItemsEditor(state.extras.newspaper.items, (items) => {
@@ -305,6 +331,7 @@ function renderPreview(): void {
   els.stage.replaceChildren(scaler);
   fitNewspaperToContent(sheet);
   applyPaperEffects(sheet);
+  drawDecorations(sheet, state.extras[state.active].decorations, selectedDeco);
   fitPreview();
   renderTelegramInfo(telegram);
   requestAnimationFrame(() => {
@@ -405,6 +432,7 @@ els.clearButton.addEventListener('click', () => {
 // ---- 整版：點一則素材可鎖定或刪除 ----
 
 els.stage.addEventListener('click', (event) => {
+  if (event.target instanceof Element && event.target.closest('.deco, .crop-overlay')) return;
   const target = event.target instanceof Element ? event.target.closest<HTMLElement>('.nb[data-block-id]') : null;
   if (!target || !lastFull || state.active !== 'newspaper') {
     closePopover();
@@ -458,6 +486,67 @@ els.stage.addEventListener('click', (event) => {
     ]);
   }
 });
+
+// ---- 裝飾：拖曳移動、滾輪縮放、Shift＋滾輪旋轉 ----
+
+function decoTarget(event: Event): { g: SVGGElement; id: string; paper: HTMLElement } | null {
+  const g = event.target instanceof Element ? event.target.closest<SVGGElement>('g.deco[data-deco-id]') : null;
+  const paper = g?.closest<HTMLElement>('.paper');
+  const id = g?.dataset['decoId'];
+  return g && paper && id ? { g, id, paper } : null;
+}
+
+function patchDecoration(id: string, patch: (d: Decoration) => Partial<Decoration>): void {
+  const kind = state.active;
+  const decorations = state.extras[kind].decorations.map((d) => (d.id === id ? { ...d, ...patch(d) } : d));
+  state = updateExtras(state, kind, { decorations } as never);
+  queueRender();
+  scheduleSave();
+}
+
+els.stage.addEventListener('pointerdown', (event) => {
+  const hit = decoTarget(event);
+  if (!hit) return;
+  event.preventDefault();
+  const deco = state.extras[state.active].decorations.find((d) => d.id === hit.id);
+  if (!deco) return;
+  if (selectedDeco !== hit.id) {
+    selectedDeco = hit.id;
+    rebuildForm();
+  }
+  const perMm = hit.paper.getBoundingClientRect().width / (hit.paper.offsetWidth / PX_PER_MM);
+  const startX = event.clientX;
+  const startY = event.clientY;
+  const base = hit.g.getAttribute('transform') ?? '';
+  let dx = 0;
+  let dy = 0;
+  const move = (e: PointerEvent): void => {
+    dx = (e.clientX - startX) / perMm;
+    dy = (e.clientY - startY) / perMm;
+    hit.g.setAttribute('transform', `translate(${dx.toFixed(2)} ${dy.toFixed(2)}) ${base}`);
+  };
+  const up = (): void => {
+    window.removeEventListener('pointermove', move);
+    window.removeEventListener('pointerup', up);
+    if (Math.abs(dx) + Math.abs(dy) > 0.05) patchDecoration(hit.id, (d) => ({ x: d.x + dx, y: d.y + dy }));
+    else queueRender();
+  };
+  window.addEventListener('pointermove', move);
+  window.addEventListener('pointerup', up);
+});
+
+els.stage.addEventListener(
+  'wheel',
+  (event) => {
+    const hit = decoTarget(event);
+    if (!hit) return;
+    event.preventDefault();
+    const dir = event.deltaY > 0 ? -1 : 1;
+    if (event.shiftKey) patchDecoration(hit.id, (d) => ({ rotate: Math.max(-180, Math.min(180, d.rotate + dir * 5)) }));
+    else patchDecoration(hit.id, (d) => ({ scale: Math.max(0.2, Math.min(4, d.scale * (dir > 0 ? 1.06 : 1 / 1.06))) }));
+  },
+  { passive: false },
+);
 
 // ---- 啟動 ----
 

@@ -1055,3 +1055,73 @@
     outline: 1px dashed rgb(180 40 30 / 0.65);
   }
 }
+
+/* ---------- 裝飾（src/render/decorations.ts） ---------- */
+
+.deco-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.deco-hit {
+  fill: transparent;
+}
+
+.deco-title {
+  font-family: var(--f-title);
+}
+
+.deco-hand {
+  font-family: var(--f-hand);
+}
+
+.deco-vertical {
+  writing-mode: vertical-rl;
+}
+
+@media screen {
+  .deco {
+    pointer-events: visiblePainted;
+    cursor: move;
+  }
+
+  .deco-hit {
+    pointer-events: all;
+  }
+
+  .deco-selected .deco-hit {
+    stroke: rgb(31 90 160 / 0.7);
+    stroke-width: 1px;
+    stroke-dasharray: 4 3;
+    vector-effect: non-scaling-stroke;
+  }
+}
+
+/* ---------- 瘋狂手寫（src/lib/madness.ts） ---------- */
+
+.mad {
+  display: inline-block;
+}
+
+.lt-overflow {
+  overflow: visible;
+}
+
+.mad-overflow {
+  white-space: nowrap;
+}
+
+/* 標記裡的「越寫越亂」字是 inline-block，刪除線與塗黑要直接加在每個字上 */
+.mk-strike .mad {
+  text-decoration: line-through;
+  text-decoration-thickness: 0.09em;
+}
+
+.mk-redact .mad {
+  background: #15110d;
+}

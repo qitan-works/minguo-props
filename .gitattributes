@@ -1,0 +1,14 @@
+# 文字檔一律以 LF 存放與取出。
+# 測試會以 \n 比對授權全文等檔案；在 Windows 以 core.autocrlf=true 取出時若變成 \r\n，
+# test/generated-fonts.test.ts 會失敗。
+* text=auto eol=lf
+
+# 二進位檔：不轉換換行，也不當文字合併或比較差異。
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.jpg binary
+*.png binary
+
+# 辰宇落雁體的授權檔必須與上游逐位元組相同（上游是 CRLF，測試會比對 SHA-256），所以不轉換換行。
+licenses/OFL-Chenyuluoyan.txt -text

@@ -16,6 +16,20 @@
 | --- | --- | --- | --- | --- | --- |
 | ![](docs/samples/preset-fire-letter.jpg) | ![](docs/samples/preset-sea-diary.jpg) | ![](docs/samples/preset-pocket-telegram.jpg) | ![](docs/samples/preset-cellar-deed.jpg) | ![](docs/samples/preset-torn-notes.jpg) | ![](docs/samples/preset-library-clipping.jpg) |
 
+整版報紙的年代預設與細節（第三版）：
+
+| 1910 年代（右側直排報頭） | 1920 年代（右上角報頭，預設） | 1930 年代（左上角報頭、現代標點） | 頂部橫排報頭、無標點 | 掃描感 |
+| --- | --- | --- | --- | --- |
+| ![](docs/samples/newspaper-1910s.jpg) | ![](docs/samples/newspaper-full.jpg) | ![](docs/samples/newspaper-1930s.jpg) | ![](docs/samples/newspaper-top.jpg) | ![](docs/samples/newspaper-scan.jpg) |
+
+| 報頭、報眉、欄名、透背（局部） | 句讀：無標點／舊式圈點／現代標點 | 鉛字質感：0／100 |
+| --- | --- | --- |
+| ![](docs/samples/newspaper-detail.jpg) | ![](docs/samples/newspaper-punctuation.jpg) | ![](docs/samples/newspaper-press.jpg) |
+
+字型總覽（直排，每一行開頭是字型名稱）：
+
+![字型總覽](docs/samples/fonts.jpg)
+
 更多範例（每種效果各一張）在 [`docs/samples/`](docs/samples/)。
 
 ## 道具種類
@@ -73,7 +87,7 @@
   在預覽上拖曳移動，滑鼠滾輪縮放、Shift＋滾輪旋轉；表單可調旋轉、縮放、透明度與疊放順序。
 - **瘋狂感的手寫**（信箋）：「越寫越亂」——從第幾個字開始，每個字隨機偏移、旋轉、縮放、筆壓深淺，強度可調；
   可夾雜塗改後重寫、同一句重複、字擠出邊界。
-- **字型**：每個道具的標題、內文、手寫部分可分別選字型（見下方字型表）。
+- **字型**：每個道具的報頭、標題、內文、廣告大字、手寫五個部分可分別選字型（見下方字型表）；共 18 套，含王漢宗自由字型的明體、隸書、仿宋、顏楷、行書與鋼筆行楷，以及清松手寫體與辰宇落雁體。電報、信箋、名片可一次套用 1910／1920／1930 年代的字型組合，報紙由「年代預設」一併設定。
 - **所有隨機效果都由固定的種子決定**，種子存進 JSON，按「換一個」重抽；預覽與列印完全一致。
 - 全部效果以 CSS、SVG 與程式產生，沒有使用任何圖片素材。
 - 民國紀年自動換算（1912 年＝民國元年）、中文數字（含「廿」「卅」寫法）、星期。
@@ -207,17 +221,17 @@
 
 | 字型 | 風格 | 來源（版本） | 授權 | 輸出 |
 | --- | --- | --- | --- | --- |
-| 王漢宗中明體 | 明體（內文） | 王漢宗自由字型 1.3.0 `wt002.ttf` | GPL-2.0-or-later，[`licenses/GPL-2.0.txt`](licenses/GPL-2.0.txt) | 7 片，1.41 MB |
+| 王漢宗中明體 | 明體（內文） | 王漢宗自由字型 1.3.0 `wt002.ttf` | GPL-2.0-or-later，[`licenses/GPL-2.0.txt`](licenses/GPL-2.0.txt) | 6 片，1.40 MB |
 | 王漢宗特明體 | 粗明體（標題） | 王漢宗自由字型 1.3.0 `wt004.ttf` | GPL-2.0-or-later | 8 片，1.73 MB |
 | 王漢宗超明體 | 特粗明體（報頭、大標） | 王漢宗自由字型 1.3.0 `wt005.ttf` | GPL-2.0-or-later | 7 片，1.57 MB |
-| 王漢宗特黑體 | 粗黑體（廣告大字） | 王漢宗自由字型 1.3.0 `wt014.ttf` | GPL-2.0-or-later | 6 片，1.13 MB |
+| 王漢宗特黑體 | 粗黑體（廣告大字） | 王漢宗自由字型 1.3.0 `wt014.ttf` | GPL-2.0-or-later | 5 片，1.12 MB |
 | 王漢宗中隸書 | 隸書 | 王漢宗自由字型 1.3.0 `wt021.ttf` | GPL-2.0-or-later | 8 片，1.81 MB |
 | 王漢宗中仿宋 | 仿宋（公文、告示） | 王漢宗自由字型 1.3.0 `wt024.ttf` | GPL-2.0-or-later | 9 片，1.96 MB |
 | 王漢宗顏楷體 | 顏體楷書 | 王漢宗自由字型 1.3.0 `wt064.ttf` | GPL-2.0-or-later | 8 片，1.82 MB |
 | 王漢宗中行書 | 行書 | 王漢宗自由字型 1.3.0 `wt071.ttf` | GPL-2.0-or-later | 9 片，2.02 MB |
 | 王漢宗鋼筆行楷 | 鋼筆行楷（手寫） | 王漢宗自由字型 1.3.0 `wthc06.ttf` | GPL-2.0-or-later | 6 片，1.33 MB |
-| 清松手寫體5（行楷） | 原子筆手寫 | jasonhandwriting/JasonHandwriting `e488583` | OFL（視為 1.1），[`licenses/OFL-JasonHandwriting.txt`](licenses/OFL-JasonHandwriting.txt) | 12 片，2.66 MB |
-| 清松手寫體7（飄逸） | 原子筆手寫 | 同上 | OFL（視為 1.1） | 12 片，2.63 MB |
+| 清松手寫體5（行楷） | 原子筆手寫 | jasonhandwriting/JasonHandwriting `e488583` | OFL（視為 1.1），[`licenses/OFL-JasonHandwriting.txt`](licenses/OFL-JasonHandwriting.txt) | 11 片，2.66 MB |
+| 清松手寫體7（飄逸） | 原子筆手寫 | 同上 | OFL（視為 1.1） | 11 片，2.62 MB |
 | 清松手寫體8（隨性） | 原子筆手寫 | 同上 | OFL（視為 1.1） | 11 片，2.48 MB |
 | 辰宇落雁體 Thin | 細筆手寫 | Chenyu-otf/chenyuluoyan_thin `6e36815`（2.100） | OFL 1.1，[`licenses/OFL-Chenyuluoyan.txt`](licenses/OFL-Chenyuluoyan.txt) | 1 個檔，5.35 MB |
 
@@ -271,6 +285,8 @@ BASE=/minguo-props/ pnpm serve
 | `pnpm serve` | 只綁定 127.0.0.1 的本機預覽伺服器（提供 `dist/`；`BASE` 環境變數可指定子路徑） |
 | `pnpm data:telegraph` | 從 unicode.org 下載 `Unihan.zip` 並重新產生 `src/data/telegraph.json` 與 `src/data/big5-level1.json` |
 | `pnpm data:check` | 重新產生並與已提交的電碼資料比對（不寫入） |
+| `pnpm data:lunar` | 下載香港天文台 1911～1950 年的公曆農曆對照表（釘選的鏡像、驗證 SHA-256），重新產生 `src/data/lunar.ts` |
+| `pnpm data:lunar-check` | 重新產生並與已提交的舊曆資料比對（不寫入） |
 | `pnpm fonts:generate` | 下載釘選的字型原始檔（快取在 `.cache/fonts/`）、驗證 SHA-256，切子集、分片、壓縮，寫入 `fonts/` 與 `fonts/manifest.json`；之後依提示更新 `src/fonts.ts` 的 SHA-256 等欄位 |
 | `pnpm fonts:check` | 重新產生到暫存目錄，與已提交的 `fonts/` 逐位元組比對（不寫入） |
 
@@ -300,12 +316,13 @@ src/
   state.ts            存檔格式（匯出／匯入、localStorage 共用）
   fonts.ts            可選字型清單（來源、版本、授權、SHA-256）
   lib/                純邏輯：民國紀年、中文數字、韻目代日、電碼查詢、亂數、幾何、剪線、紙張狀況規劃、
-                      文字層標記、裝飾形狀、越寫越亂、整版排版（lib/newspaper/）
-  props/              四種道具的欄位定義、預設內容、紙張狀況與情境預設、存檔中的結構化資料
+                      文字層標記、裝飾形狀、越寫越亂、舊曆、整版排版（lib/newspaper/：不規則版面 broadsheet、
+                      欄內流排 flow、廣告 ads、句讀 punctuation、鉛字質感 press、紙面座標 sheetgeom）
+  props/              四種道具的欄位定義、預設內容、紙張狀況與情境預設、年代預設（eras）、存檔中的結構化資料
   render/             四種道具的版面、紙張狀況、裝飾
   ui/                 表單產生器、照片處理、新聞條目、裁切、裝飾編輯、預覽選單
   styles/             介面、道具與列印樣式
-  data/               電碼資料、Big5 常用字表（由腳本產生）、填版素材
+  data/               電碼資料、Big5 常用字表、舊曆對照表（由腳本產生）、填版素材
 scripts/              建置、本機伺服器、電碼資料與字型產生腳本（tar、SFNT、WOFF 1.0、子集化、分片等工具在 scripts/lib/）
 fonts/                自行處理的字型與 manifest.json（由 pnpm fonts:generate 產生）
 .github/workflows/    CI、電碼資料比對、字型比對、GitHub Pages 部署

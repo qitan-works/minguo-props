@@ -160,10 +160,21 @@ GPL 的處理方式：
 Unicode and the Unicode Logo are registered trademarks of Unicode, Inc. in the U.S. and other countries.
 本專案與 Unicode, Inc. 沒有任何關係，也未獲其背書。
 
+## 舊曆（公曆與農曆對照）
+
+- 檔案：`src/data/lunar.ts`（1911～1949 年各農曆年的正月初一、各月天數與閏月），由 `scripts/lunar-table.ts` 產生
+- 來源：香港天文台《公曆與農曆日期對照表》（<https://www.hko.gov.hk/tc/gts/time/conversion.htm>）1911～1950 年的文字檔
+  `T<年>c.txt`。建置環境連不到天文台網站，所以從 GitHub 上原樣收錄這些檔案的 `xwjdsh/lunar` 倉庫
+  （commit `9bbf91a8c27a29d6d81cfe1529af94a691ebffeb`）下載，並驗證 40 個檔案串接後的 SHA-256
+  （`ef425d85ef6b68a303d2dbca7600d20b2ff9747e211ac08dbddabf73e066aac8`）
+- 本專案只取用其中的日期事實（每月初一的公曆日期、大小月、閏月），整理成精簡的對照表；不收錄原檔
+
 ## 其他
 
 - 紙張狀況（泛黃、紙紋、紙邊、破洞、浸水、摺痕、揉皺、斑點、霉斑等）與裝飾（血跡、戳記、怪符號等）全部以 CSS、
   SVG 與程式即時產生，沒有使用任何圖片素材；怪符號是程式隨機組合的原創圖形，不取材自任何現有作品。
-- 報紙填版素材（`src/data/fillers.ts` 與 `src/lib/newspaper/fillers.ts`）全部為本專案原創、虛構，
-  不含真實報紙文字、商號、藥名、品牌或人名，隨程式碼以 MIT 授權釋出。
+- 報紙填版素材（`src/data/fillers.ts` 與 `src/lib/newspaper/fillers.ts`，含第三版新增的副題新聞、特大字廣告與欄名）
+  全部為本專案原創、虛構，不含真實報紙文字、報頭、廣告文字、商號、藥名、品牌、商標或人名，隨程式碼以 MIT 授權釋出。
+  版面風格參考民國時期報紙的一般樣式（不規則分欄、圈點、黑底欄名等），沒有照抄任何一份真實報紙的版面或文字。
+  英文報名預設為虛構的 THE MIST HARBOUR DAILY；報頭框裡的「中華郵政特准掛號認為新聞紙類」是當時報紙通用的登記字樣，不屬於任何一家報紙。
 - 執行期沒有任何第三方 JavaScript 函式庫。

@@ -100,8 +100,10 @@ export interface EffectPlan {
   readonly holes: { readonly kind: 'burn' | 'worm' | 'pin'; readonly polygon: Point[] }[];
   /** 浸水範圍（含避開保護區的洞，以 evenodd 規則填色）。 */
   readonly water: { readonly polygons: Point[][]; readonly strength: number } | null;
-  /** 濕手抹糊的墨跡（以及必毀區的墨跡）。 */
+  /** 濕手抹糊的墨跡。 */
   readonly smudges: Point[][];
+  /** 必毀區的濃墨塗抹（沒有火燒時用來毀掉那些字）。 */
+  readonly blots: Point[][];
   readonly stains: Ellipse[];
   readonly rings: { readonly cx: number; readonly cy: number; readonly r: number; readonly arc: number; readonly rotate: number }[];
   readonly spots: Circle[];
@@ -135,6 +137,43 @@ export function blobPolygon(rng: Rng, cx: number, cy: number, r: number, roughne
     out.push({ x: cx + Math.cos(a) * r * k, y: cy + Math.sin(a) * r * k });
   }
   return out;
+}
+
+/** 緊貼矩形的不規則團塊（超橢圓，外擴 pad 公釐，只向外起伏，保證蓋住整個矩形）。 */
+function ellipseBlob(rng: Rng, target: Rect, pad: number, rough: number): Point[] {
+  const cx = target.x + target.w / 2;
+  const cy = target.y + target.h / 2;
+  // 指數 4 的超橢圓在 45° 方向約為半軸的 0.84 倍，所以半軸取半寬高的 1.19 倍即可包住四角
+  const ax = (target.w / 2) * 1.19 + pad;
+  const ay = (target.h / 2) * 1.19 + pad;
+  const n = 48;
+  const base: Point[] = [];
+  for (let i = 0; i < n; i++) {
+    const t = (i / n) * Math.PI * 2;
+    const c = Math.cos(t);
+    const s = Math.sin(t);
+    const k = 1 + rng() * 0.04;
+    base.push({ x: cx + Math.sign(c) * Math.sqrt(Math.abs(c)) * ax * k, y: cy + Math.sign(s) * Math.sqrt(Math.abs(s)) * ay * k });
+  }
+  if (rough <= 0) return base;
+  // 邊緣只往外鼓（不往內縮，免得露出該毀掉的字）：平滑過的雜訊沿外法線推出去，最多約 2.2 mm
+  const raw = base.map(() => rng());
+  const smooth = raw.map((_, i) => {
+    let sum = 0;
+    for (let d = -2; d <= 2; d++) sum += raw[(i + d + n) % n] as number;
+    return sum / 5;
+  });
+  const lo = Math.min(...smooth);
+  const span = Math.max(1e-6, Math.max(...smooth) - lo);
+  return base.map((p, i) => {
+    const a = base[(i - 1 + n) % n] as Point;
+    const b = base[(i + 1) % n] as Point;
+    const tx = b.x - a.x;
+    const ty = b.y - a.y;
+    const len = Math.hypot(tx, ty) || 1;
+    const push = rough * 2.2 * Math.pow(((smooth[i] as number) - lo) / span, 1.5);
+    return { x: p.x + (ty / len) * push, y: p.y - (tx / len) * push };
+  });
 }
 
 function boundsOf(poly: readonly Point[]): Rect {
@@ -393,16 +432,26 @@ export function planEffects(input: PlanInput): EffectPlan {
 
   // 3. 必毀區：在那裡放燒洞、浸水模糊或墨跡
   const smudges: Point[][] = [];
+  const blots: Point[][] = [];
   const burnTargets = edge === 'burnt' || s.burnHoles > 0;
   {
     const rng = rngOf('destroy');
     for (const target of input.destroy) {
-      if (hitsAny(target, protect)) continue;
-      const cx = target.x + target.w / 2;
-      const cy = target.y + target.h / 2;
-      const r = Math.max(target.w, target.h) / 2 + 1.5;
-      if (burnTargets) holes.push({ kind: 'burn', polygon: blobPolygon(rng, cx, cy, Math.max(r, 3), 0.3, 26) });
-      else smudges.push(blobPolygon(rng, cx, cy, Math.max(r, 3) * 1.15, 0.3, 26));
+      if (hitsAny(target, input.protect)) continue;
+      // 依目標的形狀（直排時是細長的一行）做成邊緣不規則的團塊；碰到保護區就先收平邊緣、再縮小外擴
+      let shape: Point[] | null = null;
+      search: for (const rough of [1, 0.5, 0]) {
+        for (const pad of [1.2, 0.6, 0.2]) {
+          const candidate = ellipseBlob(rng, target, pad, rough);
+          if (!polygonHitsAny(candidate, input.protect)) {
+            shape = candidate;
+            break search;
+          }
+        }
+      }
+      if (!shape) continue;
+      if (burnTargets) holes.push({ kind: 'burn', polygon: shape });
+      else blots.push(shape);
     }
   }
 
@@ -627,7 +676,7 @@ export function planEffects(input: PlanInput): EffectPlan {
     sun = { side: pick(rngOf('sun'), ['left', 'right', 'top', 'bottom'] as const), amount: Math.min(100, s.sunFade) };
   }
 
-  return { width: w, height: h, outline, edge, holes, water, smudges, stains, rings, spots, mold, creases, folds, rust, tape, wax, pencil, sun };
+  return { width: w, height: h, outline, edge, holes, water, smudges, blots, stains, rings, spots, mold, creases, folds, rust, tape, wax, pencil, sun };
 }
 
 /** 測試用：所有「會遮住字」的效果的外框。 */
@@ -635,6 +684,7 @@ export function obscuringShapes(plan: EffectPlan): Rect[] {
   const rects: Rect[] = [];
   for (const hole of plan.holes) rects.push(boundsOf(hole.polygon));
   for (const s of plan.smudges) rects.push(boundsOf(s));
+  for (const s of plan.blots) rects.push(boundsOf(s));
   for (const e of plan.stains) rects.push({ x: e.cx - e.rx, y: e.cy - e.rx, w: 2 * e.rx, h: 2 * e.rx });
   for (const r of plan.rings) rects.push({ x: r.cx - r.r, y: r.cy - r.r, w: 2 * r.r, h: 2 * r.r });
   for (const c of plan.spots) rects.push({ x: c.cx - c.r, y: c.cy - c.r, w: 2 * c.r, h: 2 * c.r });

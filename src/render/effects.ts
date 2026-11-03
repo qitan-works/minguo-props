@@ -84,7 +84,7 @@ function draw(paper: HTMLElement, content: HTMLElement | null, plan: EffectPlan,
     s(
       'radialGradient',
       { attrs: { id: `${id}-smear` } },
-      s('stop', { attrs: { offset: '0%', 'stop-color': 'rgb(25 22 20)', 'stop-opacity': '0.45' } }),
+      s('stop', { attrs: { offset: '0%', 'stop-color': 'rgb(25 22 20)', 'stop-opacity': '0.6' } }),
       s('stop', { attrs: { offset: '100%', 'stop-color': 'rgb(25 22 20)', 'stop-opacity': '0' } }),
     ),
     s(
@@ -161,8 +161,8 @@ function draw(paper: HTMLElement, content: HTMLElement | null, plan: EffectPlan,
   // 滴蠟
   for (const x of plan.wax) {
     svg.append(
-      s('path', { attrs: { d: path(x.drip), fill: `url(#${id}-wax)`, stroke: 'rgb(200 190 160 / 0.6)', 'stroke-width': 0.2 } }),
-      s('path', { attrs: { d: path(x.blob), fill: `url(#${id}-wax)`, stroke: 'rgb(200 190 160 / 0.7)', 'stroke-width': 0.25 } }),
+      s('path', { attrs: { d: path(x.drip), fill: `url(#${id}-wax)`, stroke: 'rgb(150 135 95 / 0.75)', 'stroke-width': 0.3, transform: 'translate(0.25 0.25)' } }),
+      s('path', { attrs: { d: path(x.blob), fill: `url(#${id}-wax)`, stroke: 'rgb(150 135 95 / 0.8)', 'stroke-width': 0.35 } }),
     );
   }
   // 浸水：潮線與皺紋（模糊另外用 backdrop-filter）
@@ -235,6 +235,14 @@ function draw(paper: HTMLElement, content: HTMLElement | null, plan: EffectPlan,
         },
       }),
     );
+  }
+  // 必毀區：濃墨塗抹，蓋在模糊層之上，字完全看不出來
+  if (plan.blots.length > 0) {
+    const ink = s('svg', { class: 'fx-svg', attrs: { viewBox: `0 0 ${w} ${ph}`, preserveAspectRatio: 'none' } });
+    for (const b of plan.blots) {
+      ink.append(strokePath(path(b), 'rgb(28 22 18 / 0.3)', 1.4), s('path', { attrs: { d: path(b), fill: 'rgb(30 24 19)' } }));
+    }
+    layer.appendChild(ink);
   }
   // 摺痕（對摺、四摺、三摺），交叉處磨白
   for (const y of plan.folds.horizontal) layer.appendChild(h('div', { class: 'fold fold-h', style: { top: `${y * 100}%` } }));

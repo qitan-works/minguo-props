@@ -131,11 +131,27 @@ describe('效果規劃：保護區與必毀區', () => {
           crop: null,
         });
         const target = destroy[0]!;
-        const covering = [...plan.holes.map((h) => h.polygon), ...plan.smudges];
+        const covering = [...plan.holes.map((h) => h.polygon), ...plan.blots];
         assert.ok(
           covering.some((poly) => rectPolygonRelation({ x: target.x + 1, y: target.y + 2, w: target.w - 2, h: target.h - 4 }, poly) === 'inside'),
           `${edge} 種子 ${seed}：必毀區沒有被蓋住`,
         );
+      }
+    }
+  });
+
+  it('必毀區是細長的直行、旁邊緊鄰保護區時，毀掉的效果不會碰到保護區', () => {
+    const tallDestroy = { x: 121.4, y: 35.8, w: 11.4, h: 64.7 };
+    const nearProtect = [
+      { x: 136.1, y: 35.8, w: 11.4, h: 55.4 },
+      { x: 106.7, y: 35.8, w: 11.4, h: 55.4 },
+    ];
+    for (const edge of ['none', 'burnt'] as const) {
+      for (let seed = 1; seed <= 15; seed++) {
+        const plan = planEffects({ width: 210, height: 297, settings: settings({ edge, effectSeed: seed }), protect: nearProtect, destroy: [tallDestroy], crop: null });
+        const covering = [...plan.holes.map((h) => h.polygon), ...plan.blots];
+        assert.ok(covering.some((poly) => rectPolygonRelation({ x: 123, y: 38, w: 8, h: 60 }, poly) === 'inside'), `${edge} ${seed}：必毀區沒被蓋住`);
+        for (const p of nearProtect) for (const poly of covering) assert.equal(rectPolygonRelation(p, poly), 'outside', `${edge} ${seed}：碰到保護區`);
       }
     }
   });

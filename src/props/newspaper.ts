@@ -1,6 +1,6 @@
 // 報紙剪報：欄位定義與預設內容。
 
-import { paperOptions } from './common.ts';
+import { fontFields, paperOptions } from './common.ts';
 import { conditionDefaults, conditionFields } from './conditions.ts';
 import { CUT_STYLES } from '../lib/cutline.ts';
 import type { DataOf, Field } from './schema.ts';
@@ -111,6 +111,7 @@ export const newspaperFields = [
   { key: 'secondTitle', type: 'text', label: '短訊標題', group: '短訊（可留空）', maxLength: 24 },
   { key: 'secondBody', type: 'textarea', label: '短訊內文', group: '短訊（可留空）', maxLength: 1000, rows: 4 },
 
+  ...fontFields('字型'),
   ...conditionFields('紙張狀況', '更多痕跡'),
 ] as const satisfies readonly Field[];
 
@@ -150,5 +151,8 @@ export const newspaperDefaults: NewspaperData = {
   secondTitle: '港口連日濃霧　輪船誤期',
   secondBody:
     '本埠連日濃霧，自前日黃昏起，港內能見度不及十丈，往來輪船多停泊口外，不敢駛入。據海關報告，昨日進口輪船僅二艘，較平日減少大半。有老船戶謂，此霧色微帶青灰，入夜猶不散，數十年來僅見一次云。',
+  fontTitle: 'noto-serif',
+  fontBody: 'noto-serif',
+  fontHand: 'lxgw',
   ...conditionDefaults({ aging: 'medium', folds: true, foldStyle: 'quarter', stains: true, effectSeed: 73129 }),
 };

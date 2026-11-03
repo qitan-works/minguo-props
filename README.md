@@ -97,10 +97,13 @@
 
 ### 字型
 
-| 字型 | 授權 | 來源 |
-| --- | --- | --- |
-| Noto Serif TC（可變字重） | SIL Open Font License 1.1 | npm 套件 `@fontsource-variable/noto-serif-tc`；上游 notofonts/noto-cjk |
-| LXGW WenKai TC（霞鶩文楷 TC） | SIL Open Font License 1.1 | npm 套件 `@fontsource/lxgw-wenkai-tc`；上游 lxgw/LxgwWenkaiTC |
+| 字型 | 風格 | 來源套件（版本） | 授權全文 |
+| --- | --- | --- | --- |
+| 思源宋體 Noto Serif TC（可變字重） | 印刷明體（預設標題與內文） | `@fontsource-variable/noto-serif-tc` 5.3.1 | [`licenses/OFL-Noto-Serif-TC.txt`](licenses/OFL-Noto-Serif-TC.txt) |
+| 仙人掌明體 Cactus Classical Serif | 鉛字風格的傳統明體，最有民國印刷味 | `@fontsource/cactus-classical-serif` 5.3.1 | [`licenses/OFL-Cactus-Classical-Serif.txt`](licenses/OFL-Cactus-Classical-Serif.txt) |
+| 霞鶩文楷 TC（LXGW WenKai TC） | 楷書（預設手寫） | `@fontsource/lxgw-wenkai-tc` 5.3.1 | [`licenses/OFL-LXGW-WenKai-TC.txt`](licenses/OFL-LXGW-WenKai-TC.txt) |
+| 芫荽 Iansui | 鋼筆手寫 | `@fontsource/iansui` 5.3.1 | [`licenses/OFL-Iansui.txt`](licenses/OFL-Iansui.txt) |
+| jf open 粉圓 Huninn | 現代圓體（不太像民國，但可選） | `@fontsource/huninn` 5.3.1 | [`licenses/OFL-Huninn.txt`](licenses/OFL-Huninn.txt) |
 
 字型套件只在建置時讀取，`pnpm build` 會把依 Unicode 範圍切好的 woff2 分片複製到 `dist/fonts/`，
 瀏覽器只下載實際用到的分片。授權全文在 [`licenses/`](licenses/)，彙整見 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)。

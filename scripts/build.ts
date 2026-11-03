@@ -6,25 +6,13 @@ import { copyFile, mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { createHash } from 'node:crypto';
+
+import { FONTS } from '../src/fonts.ts';
 import { rewriteFontCss } from './lib/fonts.ts';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const dist = path.join(root, 'dist');
-
-interface FontSource {
-  /** node_modules 裡的套件名稱（開發依賴，只在建置時讀取）。 */
-  readonly pkg: string;
-  /** 套件內的 CSS 檔。 */
-  readonly css: string;
-  /** 輸出目錄名稱（dist/fonts/<dir>）。 */
-  readonly dir: string;
-  readonly license: string;
-}
-
-const FONTS: readonly FontSource[] = [
-  { pkg: '@fontsource-variable/noto-serif-tc', css: 'index.css', dir: 'noto-serif-tc', license: 'OFL-Noto-Serif-TC.txt' },
-  { pkg: '@fontsource/lxgw-wenkai-tc', css: '400.css', dir: 'lxgw-wenkai-tc', license: 'OFL-LXGW-WenKai-TC.txt' },
-];
 
 function run(cmd: string, args: readonly string[]): void {
   const result = spawnSync(cmd, args, { cwd: root, stdio: 'inherit' });
@@ -44,14 +32,21 @@ async function buildFonts(): Promise<void> {
   ];
   for (const font of FONTS) {
     const pkgDir = path.join(root, 'node_modules', font.pkg);
+    const pkgJson = JSON.parse(await readFile(path.join(pkgDir, 'package.json'), 'utf8')) as { version?: string };
+    if (pkgJson.version !== font.version) throw new Error(`${font.pkg} 版本為 ${pkgJson.version}，預期 ${font.version}`);
     const css = await readFile(path.join(pkgDir, font.css), 'utf8');
     const { css: rewritten, files } = rewriteFontCss(css, font.dir);
-    if (files.length === 0) throw new Error(`${font.pkg} 沒有任何 woff2 檔`);
+    if (files.length !== font.woff2Count) throw new Error(`${font.pkg} 有 ${files.length} 個 woff2，預期 ${font.woff2Count}`);
+    // 驗證實際要提供的字型檔與登記的 SHA-256 相符
+    const hash = createHash('sha256');
+    for (const file of [...files].sort()) hash.update(await readFile(path.join(pkgDir, 'files', file)));
+    const digest = hash.digest('hex');
+    if (digest !== font.sha256) throw new Error(`${font.pkg} 的字型檔 SHA-256 不符：${digest}`);
     for (const file of files) {
       await copyInto(path.join(pkgDir, 'files', file), path.join(dist, 'fonts', font.dir, file));
     }
     await copyInto(path.join(pkgDir, 'LICENSE'), path.join(dist, 'fonts', font.dir, 'LICENSE.txt'));
-    parts.push(`/* ${font.pkg}（${files.length} 個 woff2 分片） */`, rewritten.trim());
+    parts.push(`/* ${font.pkg}@${font.version}（${files.length} 個 woff2 分片，SHA-256 ${font.sha256}） */`, rewritten.trim());
   }
   await writeFile(path.join(dist, 'fonts', 'fonts.css'), `${parts.join('\n\n')}\n`, 'utf8');
 }

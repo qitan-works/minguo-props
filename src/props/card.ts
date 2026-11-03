@@ -1,5 +1,6 @@
 // 名片／請帖：欄位定義與預設內容。尺寸為 90×54 mm（可選直式），亦可拼版印在 A4 上。
 
+import { fontFields } from './common.ts';
 import { conditionDefaults, conditionFields } from './conditions.ts';
 import type { DataOf, Field } from './schema.ts';
 
@@ -64,6 +65,7 @@ export const cardFields = [
   { key: 'inviteVenue', type: 'text', label: '席設', group: '請帖', maxLength: 16, showIf: INVITE },
   { key: 'inviteHost', type: 'text', label: '主人', group: '請帖', maxLength: 16, showIf: INVITE },
 
+  ...fontFields('字型'),
   ...conditionFields('紙張狀況', '更多痕跡'),
 ] as const satisfies readonly Field[];
 
@@ -86,5 +88,8 @@ export const cardDefaults: CardData = {
   inviteTime: '下午六時',
   inviteVenue: '霧港聚雲樓',
   inviteHost: '林守仁',
+  fontTitle: 'noto-serif',
+  fontBody: 'noto-serif',
+  fontHand: 'lxgw',
   ...conditionDefaults({ aging: 'light', folds: false, foldStyle: 'half', stains: false, effectSeed: 52817 }),
 };

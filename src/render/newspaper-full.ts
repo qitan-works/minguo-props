@@ -116,6 +116,7 @@ export function renderNewspaperFull(data: NewspaperData, extras: NewspaperExtras
     width: size.width,
     height: size.height,
     conditions: pickConditions(data),
+    fonts: { title: data.fontTitle, body: data.fontBody, hand: data.fontHand },
     crop: extras.crop,
     className: 'nf-paper',
   });

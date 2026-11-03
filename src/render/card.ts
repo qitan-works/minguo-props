@@ -47,6 +47,7 @@ function cardSurface(data: CardData, width: number, height: number, index: numbe
     width,
     height,
     conditions: pickConditions(data),
+    fonts: { title: data.fontTitle, body: data.fontBody, hand: data.fontHand },
     variant: index,
     crop,
     className: `cd-paper stock-${data.stock}`,

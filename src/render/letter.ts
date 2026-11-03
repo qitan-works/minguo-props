@@ -34,6 +34,7 @@ export function renderLetter(data: LetterData, crop: Polygon | null = null): HTM
     width: size.width,
     height: size.height,
     conditions: pickConditions(data),
+    fonts: { title: data.fontTitle, body: data.fontBody, hand: data.fontHand },
     crop,
     className: 'lt-paper',
   });

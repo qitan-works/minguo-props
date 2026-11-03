@@ -90,7 +90,7 @@ function familyNotice(rng: Rng, id: string): FillerItem {
     id,
     kind: 'notice',
     title: '訃告',
-    body: `先嚴${name.slice(0, 1)}公諱${name.slice(1)}，痛於本月${cn(int(rng, 1, 28))}日壽終正寢，享壽${cn(int(rng, 58, 86))}歲。謹擇吉日開弔，哀此訃聞。孤哀子${name.slice(0, 1)}${pick(rng, VOCAB.givenChars)}${pick(rng, VOCAB.givenChars)}泣血稽顙`,
+    body: `先嚴${name.slice(0, 1)}公諱${name.slice(1)}，痛於本月${cn(int(rng, 1, 28))}日壽終正寢，享壽${cn(int(rng, 58, 86))}歲。謹擇吉日開弔，哀此訃聞。孤哀子${name.slice(0, 1)}${pick(rng, VOCAB.givenChars)}${pick(rng, VOCAB.givenChars)}泣血叩首`,
   };
 }
 

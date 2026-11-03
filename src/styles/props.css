@@ -9,7 +9,7 @@
   background: #fff;
   overflow: hidden;
   color: #1f1a14;
-  font-family: var(--font-serif);
+  font-family: var(--f-body);
   line-height: 1.4;
 }
 
@@ -156,8 +156,25 @@
   white-space: nowrap;
 }
 
+.paper-content {
+  font-family: var(--f-body);
+}
+
 .hand {
-  font-family: var(--font-hand);
+  font-family: var(--f-hand);
+}
+
+/* 標題用「標題字型」 */
+.np-title,
+.np-mh-title,
+.np-second-title,
+.nf-title,
+.nl-title,
+.nl-big,
+.tg-office,
+.tg-form-title,
+.cd-name {
+  font-family: var(--f-title);
 }
 
 /* ---------- 報紙剪報 ---------- */
@@ -167,7 +184,6 @@
   flex-direction: column;
   gap: 3mm;
   padding: var(--np-pad);
-  font-family: var(--font-serif);
   color: #1b1712;
 }
 
@@ -366,7 +382,6 @@
 
 .nf {
   color: #1b1712;
-  font-family: var(--font-np-body, var(--font-serif));
 }
 
 .nf-masthead {
@@ -385,7 +400,6 @@
 
 .nf-title {
   align-self: center;
-  font-family: var(--font-np-title, var(--font-serif));
   font-weight: 900;
   line-height: 1;
   letter-spacing: 0.06em;
@@ -450,7 +464,6 @@
 
 .nl-title,
 .nl-big {
-  font-family: var(--font-np-title, var(--font-serif));
   font-weight: 900;
 }
 
@@ -509,7 +522,6 @@
   --form: #2b5759;
   --hand-ink: #1c2850;
   color: var(--form);
-  font-family: var(--font-serif);
 }
 
 .tg-frame {
@@ -628,7 +640,7 @@
   justify-self: center;
   writing-mode: vertical-rl;
   text-orientation: upright;
-  font-family: var(--font-hand);
+  font-family: var(--f-hand);
   font-size: calc(2.35mm * var(--k));
   line-height: 1;
   letter-spacing: -0.04em;
@@ -824,7 +836,6 @@
   display: flex;
   padding: 4.5mm 4mm;
   color: #1d1914;
-  font-family: var(--font-serif);
 }
 
 .stock-red .cd {
@@ -883,7 +894,7 @@
 .cd-invite .cd-row {
   justify-content: space-around;
   gap: 1.5mm;
-  font-family: var(--font-hand);
+  font-family: var(--f-hand);
 }
 
 .cd-inv-line {

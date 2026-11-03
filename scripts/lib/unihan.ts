@@ -169,3 +169,36 @@ export function serializeTelegraphData(data: TelegraphDataFile): string {
   lines.push('}');
   return `${lines.join('\n')}\n`;
 }
+
+/**
+ * Big5 常用字（第一字面，A440–C67E，共 5,401 字），取自 kBigFive 欄位，依 Big5 碼排序。
+ * Big5 常用字是依教育部〈常用國字標準字體表〉編成的，用來檢查字型是否涵蓋常用字。
+ */
+export function big5Level1(text: string): string[] {
+  // 值後面加「'」的是近似對應（例如「彞」對應到「彝」的碼），不算。
+  const entries = parseUnihanField(text, 'kBigFive')
+    .filter((e) => /^[0-9A-F]{4}$/.test(e.value))
+    .map((e) => ({ char: e.char, code: Number.parseInt(e.value, 16) }))
+    .filter((e) => Number.isFinite(e.code) && e.code >= 0xa440 && e.code <= 0xc67e)
+    .sort((a, b) => a.code - b.code);
+  return entries.map((e) => e.char);
+}
+
+export function serializeBig5Level1(chars: readonly string[], meta: BuildMeta): string {
+  const head = {
+    $comment:
+      '由 scripts/unihan-telegraph.ts 自動產生，請勿手動修改。Big5 常用字（A440–C67E），取自 Unicode Unihan 資料庫的 kBigFive 欄位，用來檢查字型涵蓋的常用字。授權見 licenses/Unicode-License-v3.txt。',
+    unicodeVersion: meta.unicodeVersion,
+    field: 'kBigFive',
+    range: 'A440-C67E',
+    source: meta.source,
+    sha256: meta.sha256,
+    license: 'Unicode-3.0',
+    count: chars.length,
+  };
+  const lines = Object.entries(head).map(([k, v]) => `${JSON.stringify(k)}:${JSON.stringify(v)},`);
+  // 每 100 字一行，方便審查差異
+  const chunks: string[] = [];
+  for (let i = 0; i < chars.length; i += 100) chunks.push(JSON.stringify(chars.slice(i, i + 100).join('')));
+  return `{\n${lines.join('\n')}\n"chars":[\n${chunks.join(',\n')}\n]\n}\n`;
+}

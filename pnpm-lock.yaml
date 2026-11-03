@@ -11,6 +11,15 @@ importers:
       '@fontsource-variable/noto-serif-tc':
         specifier: 5.3.1
         version: 5.3.1
+      '@fontsource/cactus-classical-serif':
+        specifier: 5.3.1
+        version: 5.3.1
+      '@fontsource/huninn':
+        specifier: 5.3.1
+        version: 5.3.1
+      '@fontsource/iansui':
+        specifier: 5.3.1
+        version: 5.3.1
       '@fontsource/lxgw-wenkai-tc':
         specifier: 5.3.1
         version: 5.3.1
@@ -25,6 +34,15 @@ packages:
 
   '@fontsource-variable/noto-serif-tc@5.3.1':
     resolution: {integrity: sha512-IW3Pydbc5NWA5JNPyk2SST3x85STRtakYXs4HQKU2cv3xB4Y192z1OV2z09XOS9TcZckbPPzagpQ1lgeBjSFNw==}
+
+  '@fontsource/cactus-classical-serif@5.3.1':
+    resolution: {integrity: sha512-NQ5PU3v+DpOMaK51CMGHvo/XNgR0xzhSwIP6AE4A2JI/ISZMZ4D7kSnqPNRGpDB5GHvzIRkrYQ90l8n03Qyx7A==}
+
+  '@fontsource/huninn@5.3.1':
+    resolution: {integrity: sha512-HtOVUW6s2t0pLPG0eKNh+WFAb345BYax0/4HJWpbfcEE9vXteHrm/guhmP+gBu/zBcgze3I1IstEz6ztr8JYfw==}
+
+  '@fontsource/iansui@5.3.1':
+    resolution: {integrity: sha512-bUH6dwlGa7XWRWH8R5isywTWA2Xw6dxWFDct19uMHA3+thRojBq4x0BQzyNoM3oUDLPAwBC+lEb3PuvoSYOQbQ==}
 
   '@fontsource/lxgw-wenkai-tc@5.3.1':
     resolution: {integrity: sha512-oulAMD2B40s+em16ZgcawwoVcBLBackzByuNzOg6D99J4G5Jjf6QyDvQFHWt3lIy3GgzQGGiU9mjIUvx5k7r4A==}
@@ -43,6 +61,12 @@ packages:
 snapshots:
 
   '@fontsource-variable/noto-serif-tc@5.3.1': {}
+
+  '@fontsource/cactus-classical-serif@5.3.1': {}
+
+  '@fontsource/huninn@5.3.1': {}
+
+  '@fontsource/iansui@5.3.1': {}
 
   '@fontsource/lxgw-wenkai-tc@5.3.1': {}
 

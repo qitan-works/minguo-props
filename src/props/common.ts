@@ -1,5 +1,6 @@
 // 各道具共用的欄位：紙張做舊效果。
 
+import { FONT_OPTIONS } from '../fonts.ts';
 import type { Option } from './schema.ts';
 
 export const AGING_OPTIONS = [
@@ -44,4 +45,13 @@ export function paperOptions(keys: readonly PaperKey[]): Option[] {
 
 export function isPaperKey(value: string): value is PaperKey {
   return Object.prototype.hasOwnProperty.call(PAPER_SIZES, value);
+}
+
+/** 每個道具的標題、內文、手寫部分可分別選字型。 */
+export function fontFields<G extends string>(group: G) {
+  return [
+    { key: 'fontTitle', type: 'select', label: '標題字型', options: FONT_OPTIONS, group },
+    { key: 'fontBody', type: 'select', label: '內文字型', options: FONT_OPTIONS, group },
+    { key: 'fontHand', type: 'select', label: '手寫字型', options: FONT_OPTIONS, group, hint: '字型只有在選用時才會下載，而且只下載用到的字。' },
+  ] as const;
 }

@@ -3,6 +3,7 @@
 // 量出保護區與必毀區的位置之後，才由 src/render/effects.ts 畫上去（見 applyPaperEffects）。
 // 全部用 CSS、SVG 與 canvas 即時產生，不使用任何圖片素材。
 
+import { fontStack } from '../fonts.ts';
 import type { Polygon } from '../lib/geometry.ts';
 import { mulberry32 } from '../lib/random.ts';
 import { PAPER_SIZES, type PaperKey } from '../props/common.ts';
@@ -36,6 +37,8 @@ export interface PaperSurfaceOptions {
   /** 自由裁切或「從整版剪下」的外形（紙面座標，公釐）。 */
   readonly crop?: Polygon | null;
   readonly className: string;
+  /** 標題、內文、手寫部分的字型（src/fonts.ts 的 id）。 */
+  readonly fonts?: { readonly title: string; readonly body: string; readonly hand: string };
 }
 
 /** 建立紙面（道具本體），回傳紙面與放內容的容器。 */
@@ -43,6 +46,11 @@ export function createPaperSurface(options: PaperSurfaceOptions): { paper: HTMLD
   const c = options.conditions;
   const level = ['none', 'light', 'medium', 'heavy'].includes(c.aging) ? c.aging : 'none';
   const content = h('div', { class: 'paper-content' });
+  if (options.fonts) {
+    content.style.setProperty('--f-title', fontStack(options.fonts.title, 'title'));
+    content.style.setProperty('--f-body', fontStack(options.fonts.body, 'body'));
+    content.style.setProperty('--f-hand', fontStack(options.fonts.hand, 'hand'));
+  }
   const paper = h(
     'div',
     {

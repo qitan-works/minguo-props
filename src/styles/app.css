@@ -3,6 +3,10 @@
 :root {
   --font-serif: 'Noto Serif TC Variable', 'Noto Serif TC', 'Source Han Serif TC', 'Songti TC', 'PMingLiU', serif;
   --font-hand: 'LXGW WenKai TC', 'Kaiti TC', 'BiauKai', 'DFKai-SB', var(--font-serif);
+  /* 道具的標題、內文、手寫字型（各道具可改） */
+  --f-title: var(--font-serif);
+  --f-body: var(--font-serif);
+  --f-hand: var(--font-hand);
   --ui-bg: #ece6da;
   --ui-panel: #faf7f1;
   --ui-text: #2a241d;

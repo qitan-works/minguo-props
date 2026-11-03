@@ -28,6 +28,7 @@ export function renderNewspaper(data: NewspaperData, crop: Polygon | null = null
     width,
     height,
     conditions: pickConditions(data),
+    fonts: { title: data.fontTitle, body: data.fontBody, hand: data.fontHand },
     roughEdge: data.clipEdge,
     crop,
     className: 'np-paper',

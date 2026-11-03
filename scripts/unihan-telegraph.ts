@@ -1,4 +1,5 @@
-// 產生 src/data/telegraph.json：中文電碼（Unicode Unihan 資料庫的 kTaiwanTelegraph 欄位）。
+// 產生 src/data/telegraph.json：中文電碼（Unicode Unihan 資料庫的 kTaiwanTelegraph 欄位），
+// 以及 src/data/big5-level1.json：Big5 常用字 5,401 字（kBigFive），用來檢查字型涵蓋範圍。
 //
 // 用法：
 //   pnpm data:telegraph                  # 從 unicode.org 下載、驗證、產生並寫入
@@ -23,10 +24,12 @@ import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 
 import {
+  big5Level1,
   buildTelegraphData,
   buildVariantFallback,
   parseTaiwanTelegraph,
   parseUnihanVariants,
+  serializeBig5Level1,
   serializeTelegraphData,
 } from './lib/unihan.ts';
 import { extractZipFile } from './lib/zip.ts';
@@ -39,6 +42,7 @@ const MAPPINGS = 'Unihan_OtherMappings.txt';
 const VARIANTS = 'Unihan_Variants.txt';
 
 const OUTPUT = fileURLToPath(new URL('../src/data/telegraph.json', import.meta.url));
+const BIG5_OUTPUT = fileURLToPath(new URL('../src/data/big5-level1.json', import.meta.url));
 
 async function download(url: string): Promise<Buffer> {
   console.error(`下載 ${url}`);
@@ -72,7 +76,8 @@ async function main(): Promise<void> {
   const zip = values.zip ? await readFile(values.zip) : await download(UNIHAN_URL);
   verify(zip);
 
-  const entries = parseTaiwanTelegraph(extractZipFile(zip, MAPPINGS).toString('utf8'));
+  const mappings = extractZipFile(zip, MAPPINGS).toString('utf8');
+  const entries = parseTaiwanTelegraph(mappings);
   const variants = buildVariantFallback(entries, parseUnihanVariants(extractZipFile(zip, VARIANTS).toString('utf8')));
   const data = buildTelegraphData(entries, variants, {
     unicodeVersion: UNICODE_VERSION,
@@ -80,9 +85,18 @@ async function main(): Promise<void> {
     sha256: UNIHAN_SHA256,
   });
   const json = serializeTelegraphData(data);
+  const big5 = big5Level1(mappings);
+  if (big5.length !== 5401) throw new Error(`Big5 常用字應為 5401 字，實際 ${big5.length}`);
+  const big5Json = serializeBig5Level1(big5, { unicodeVersion: UNICODE_VERSION, source: UNIHAN_URL, sha256: UNIHAN_SHA256 });
 
   if (values.check) {
     const committed = await readFile(OUTPUT, 'utf8').catch(() => '');
+    const committedBig5 = await readFile(BIG5_OUTPUT, 'utf8').catch(() => '');
+    if (committedBig5 !== big5Json) {
+      console.error(`${BIG5_OUTPUT} 與重新產生的結果不一致，請執行 pnpm data:telegraph 並提交。`);
+      process.exitCode = 1;
+      return;
+    }
     if (committed !== json) {
       console.error(`${OUTPUT} 與重新產生的結果不一致，請執行 pnpm data:telegraph 並提交。`);
       process.exitCode = 1;
@@ -93,6 +107,7 @@ async function main(): Promise<void> {
   }
 
   await writeFile(OUTPUT, json, 'utf8');
+  await writeFile(BIG5_OUTPUT, big5Json, 'utf8');
   console.error(`已寫入 ${OUTPUT}（${data.count} 字，異體字代查 ${data.variantCount} 字）。`);
 }
 

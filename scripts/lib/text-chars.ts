@@ -154,9 +154,32 @@ export function tsStringContents(source: string): string[] {
   return out;
 }
 
-/** HTML 的文字與屬性值（去掉 <!-- --> 註解）。 */
+/**
+ * HTML 的文字與屬性值（去掉 <!-- --> 註解，只用來收集要放進字型子集的字，不會再當成 HTML 輸出）。
+ * 由左往右掃描：遇到 <!-- 就跳到下一個 -->，沒有結尾的註解一路刪到檔尾。刪掉之後前後的字可能又拼出
+ * 新的 <!--（例如「<!」＋「--」），所以重複掃描到不再有 <!-- 為止。
+ */
 export function htmlText(source: string): string {
-  return source.replace(/<!--[\s\S]*?-->/g, '');
+  let text = source;
+  while (text.includes('<!--')) text = stripCommentsOnce(text);
+  return text;
+}
+
+function stripCommentsOnce(source: string): string {
+  let out = '';
+  let i = 0;
+  while (i < source.length) {
+    const start = source.indexOf('<!--', i);
+    if (start < 0) {
+      out += source.slice(i);
+      break;
+    }
+    out += source.slice(i, start);
+    const end = source.indexOf('-->', start + 4);
+    if (end < 0) break;
+    i = end + 3;
+  }
+  return out;
 }
 
 /** 字串裡的非 ASCII 字元（略過位元組順序記號 U+FEFF）。 */

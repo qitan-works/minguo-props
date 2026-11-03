@@ -11,7 +11,7 @@ import { gzipSync } from 'node:zlib';
 import { firstSlice, parseUnicodeRange, restSlices, unicodeRanges, VERTICAL_FORMS } from '../scripts/lib/font-slices.ts';
 import { buildName, buildSfnt, parseName, readSfnt, sfntTable, tableChecksum, windowsNameRecord } from '../scripts/lib/sfnt.ts';
 import { extractTarFile, readTar, readTarGz } from '../scripts/lib/tar.ts';
-import { scanTextChars, tsStringContents } from '../scripts/lib/text-chars.ts';
+import { scanTextChars, tsStringContents, htmlText } from '../scripts/lib/text-chars.ts';
 import { assertWellFormedSfnt, decodeWoff, encodeWoff } from '../scripts/lib/woff.ts';
 
 // ---------- tar ----------
@@ -237,5 +237,14 @@ describe('分片與 unicode-range', () => {
     ]);
     assert.throws(() => parseUnicodeRange('U+4e05-4e01'), /顛倒/);
     assert.throws(() => parseUnicodeRange('4e01'), /格式錯誤/);
+  });
+});
+
+describe('HTML 註解去除（收字用）', () => {
+  it('去掉註解，巢狀或沒有結尾的註解也不會殘留 <!--', () => {
+    assert.equal(htmlText('甲<!-- 乙 -->丙'), '甲丙');
+    assert.equal(htmlText('甲<!--<!-- 乙 -->丙-->丁'), '甲丙-->丁');
+    assert.equal(htmlText('甲<!-- 沒有結尾'), '甲');
+    for (const s of ['<!<!--- -->--', '<!--<!---->-->', 'a<!--b<!--c-->d']) assert.equal(htmlText(s).includes('<!--'), false, s);
   });
 });

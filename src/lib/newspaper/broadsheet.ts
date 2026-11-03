@@ -35,10 +35,13 @@ export interface BandLine {
   readonly row: number;
 }
 
-/** 主新聞的橫排標題（由右而左）。 */
+/** 橫排標題（由右而左），跨整個區塊寬。 */
 export interface HeadlineBand {
   readonly rows: number;
   readonly lines: readonly BandLine[];
+  /** 這個標題屬於哪一則（點選鎖定用）。 */
+  readonly itemId?: string;
+  readonly source?: 'user' | 'filler';
 }
 
 export type FrameStyle = 'double' | 'thickthin' | 'dotted' | 'corners' | 'plain';
@@ -177,15 +180,15 @@ export function fullWidthBoundaries(owner: Int32Array, cols: number, rows: numbe
 }
 
 /** 主新聞的橫排標題：一到兩行，字盡量大。 */
-export function headlineBand(title: string, width: number, aspect: number, mode: PunctuationMode): HeadlineBand | null {
+export function headlineBand(title: string, width: number, aspect: number, mode: PunctuationMode, maxSize = 3.4): HeadlineBand | null {
   const chars = Array.from(headlinePunctuation(toFullWidth(title.trim()), mode));
   if (chars.length === 0 || width < 3) return null;
   const widthInCells = width * aspect * 0.94;
   let lines = 1;
-  let size = Math.min(3.4, widthInCells / chars.length);
-  if (size < 2.2 && chars.length > 4) {
+  let size = Math.min(maxSize, widthInCells / chars.length);
+  if (size < Math.min(2.2, maxSize * 0.8) && chars.length > 4) {
     lines = 2;
-    size = Math.min(3.4, widthInCells / Math.ceil(chars.length / 2));
+    size = Math.min(maxSize, widthInCells / Math.ceil(chars.length / 2));
   }
   size = Math.max(1.4, Math.round(size * 10) / 10);
   const per = Math.ceil(chars.length / lines);
@@ -289,7 +292,7 @@ function pack(input: BroadsheetInput, rng: Rng): Packing {
       const band = result.band;
       const slots = slotsFor(columns, gap + (band?.rows ?? 0));
       if (!result.laid || result.laid.truncated) overflow = true;
-      addRegion({ kind: 'main', columns, gapTop: gap > 0, ...(band ? { band } : {}), slots, lines: result.laid?.lines ?? [] });
+      addRegion({ kind: 'main', columns, gapTop: gap > 0, ...(band ? { band: { ...band, itemId: mainItem.id, source: mainItem.source } } : {}), slots, lines: result.laid?.lines ?? [] });
       used.push(mainItem.id);
     }
   }
@@ -406,13 +409,41 @@ function pack(input: BroadsheetInput, rng: Rng): Packing {
         columns = columns.map((col, j) => (j >= wr ? { ...col, bottom: s + h2 } : col));
       }
     }
-    const tag = w >= 4 && rng() < 0.32 && input.tags.length > 0 ? pick(rng, input.tags) : undefined;
+    // 部分新聞的標題橫排（由右而左），跨整個區塊寬
+    const head = queue[0];
+    const flatTop = new Set(columns.map((c) => c.bottom)).size === 1;
+    const band =
+      head && head.level === 2 && head.title && w >= 6 && flatTop && rng() < 0.45
+        ? headlineBand(head.title, w, input.aspect, input.mode, 2.3)
+        : null;
+    const tag = !band && w >= 4 && rng() < 0.32 && input.tags.length > 0 ? pick(rng, input.tags) : undefined;
     const tagRows = tag ? Array.from(tag).length + 1 : 0;
-    const slots = slotsFor(columns, gap, tagRows);
-    const flowed = flowRegion(slots, queue, { mode: input.mode, tiny, lookahead: 12 });
+    const slots = slotsFor(columns, gap + (band?.rows ?? 0), tagRows);
+    const lines: FlowLine[] = [];
+    let start = 0;
+    if (band && head) {
+      const laid = layoutItem({ ...head, title: '' }, slots, 0, input.mode, true);
+      if (laid) {
+        queue.shift();
+        lines.push(...laid.lines);
+        used.push(head.id);
+        if (laid.truncated && userIds.has(head.id)) overflow = true;
+        start = laid.used;
+      }
+    }
+    const flowed = flowRegion(slots.slice(start), queue, { mode: input.mode, tiny, lookahead: 12 });
+    lines.push(...flowed.lines.map((l) => ({ ...l, slot: l.slot + start })));
     used.push(...flowed.used);
     for (const id of flowed.truncated) if (userIds.has(id)) overflow = true;
-    addRegion({ kind: 'text', columns, gapTop: gap > 0, ...(tag ? { tag: { text: tag, rows: tagRows } } : {}), slots, lines: flowed.lines });
+    addRegion({
+      kind: 'text',
+      columns,
+      gapTop: gap > 0,
+      ...(tag ? { tag: { text: tag, rows: tagRows } } : {}),
+      ...(band && head && start > 0 ? { band: { ...band, itemId: head.id, source: head.source } } : {}),
+      slots,
+      lines,
+    });
   }
   for (const id of userIds) if (!used.includes(id)) overflow = true;
   return { regions, owner, used, overflow };

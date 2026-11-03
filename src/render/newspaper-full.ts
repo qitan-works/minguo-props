@@ -160,10 +160,14 @@ function textRegion(region: Region, index: number, ctx: Ctx, lockedIds: Readonly
     const r = regionRect(g, region);
     const top = rowTop(g, (region.columns[0]?.top ?? 0) + (region.gapTop ? 1 : 0));
     const band = region.band;
-    const wrap = h('div', { class: ['nb', 'nb-main', 'nb-user'], dataset: { blockId: 'main', source: 'user' } });
+    const source = band.source ?? 'user';
+    const wrap = h('div', {
+      class: ['nb', `nb-${region.kind}`, source === 'user' && 'nb-user', lockedIds.has(band.itemId ?? '') && 'nb-locked'],
+      dataset: { blockId: band.itemId ?? 'main', source },
+    });
     band.lines.forEach((line, i) => {
       const el = h('div', {
-        class: 'nf-band',
+        class: ['nf-band', region.kind !== 'main' && 'nf-band-2'],
         style: { left: mm(r.x), top: mm(top + line.row * g.cell), width: mm(r.w), height: mm(line.size * g.cell * 1.08), 'font-size': mm(line.size * g.cell), 'line-height': mm(line.size * g.cell * 1.08) },
       });
       fillGlyphs(el, Array.from(line.text).map((ch) => ({ ch })), { ...ctx, press: ctx.press * 0.6 }, `band:${i}`);

@@ -169,10 +169,23 @@
 .np-mh-title,
 .np-second-title,
 .nf-title,
-.tg-office,
 .tg-form-title,
 .cd-name {
   font-family: var(--f-title);
+}
+
+/* 報頭字型：報紙報頭、電報局名、請帖抬頭 */
+.np-mh-title,
+.tg-office,
+.cd-invite .cd-inv-line:first-child {
+  font-family: var(--f-masthead);
+}
+
+/* 廣告大字字型：名片的機構名、信紙左下角的箋紙店號、電報局戳 */
+.cd-org,
+.lt-stationer,
+.tg-stamp-arc-text {
+  font-family: var(--f-ad);
 }
 
 /* ---------- 報紙剪報 ---------- */
@@ -531,6 +544,10 @@
 
 .nl-sub {
   font-weight: 600;
+}
+
+.nf-band-2 {
+  font-family: var(--f-h2);
 }
 
 .nf-band {
@@ -953,7 +970,7 @@
 
 .tg-stamp text {
   fill: currentColor;
-  font-family: var(--font-serif);
+  font-family: var(--f-ad, var(--font-serif));
   font-weight: 700;
 }
 
@@ -1039,7 +1056,7 @@
   left: var(--frame-l);
   top: calc(var(--frame-t) + var(--frame-h) + 3mm);
   color: var(--red);
-  font-family: var(--font-serif);
+  font-family: var(--f-ad, var(--font-serif));
   font-size: 2.6mm;
   letter-spacing: 0.15em;
   opacity: 0.85;

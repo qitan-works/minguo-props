@@ -50,10 +50,10 @@ export function isPaperKey(value: string): value is PaperKey {
 /** 每個道具的報頭、標題、內文、廣告大字、手寫部分可分別選字型。 */
 export function fontFields<G extends string>(group: G) {
   return [
-    { key: 'fontMasthead', type: 'select', label: '報頭字型', options: FONT_OPTIONS, group },
+    { key: 'fontMasthead', type: 'select', label: '報頭字型', options: FONT_OPTIONS, group, hint: '報紙的報頭；電報的局名；請帖的抬頭。' },
     { key: 'fontTitle', type: 'select', label: '標題字型', options: FONT_OPTIONS, group },
     { key: 'fontBody', type: 'select', label: '內文字型', options: FONT_OPTIONS, group },
-    { key: 'fontAd', type: 'select', label: '廣告大字字型', options: FONT_OPTIONS, group },
+    { key: 'fontAd', type: 'select', label: '廣告大字字型', options: FONT_OPTIONS, group, hint: '報紙廣告的特大字；名片的機構名；信紙的箋紙店號；電報局戳。' },
     { key: 'fontHand', type: 'select', label: '手寫字型', options: FONT_OPTIONS, group, hint: '字型只有在選用時才會下載，而且只下載用到的字。' },
   ] as const;
 }

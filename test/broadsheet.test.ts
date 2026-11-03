@@ -87,6 +87,12 @@ describe('整版不規則版面', () => {
     }
   }
 
+  it('部分新聞（不只主新聞）的標題橫排，跨整個區塊寬', () => {
+    let count = 0;
+    for (const seed of [1, 2, 3, 4, 5, 6]) count += page({ seed }).b.regions.filter((r) => r.kind === 'text' && r.band).length;
+    assert.ok(count >= 3, `六個種子只有 ${count} 則橫排標題`);
+  });
+
   it('同一種子排出同樣的版面；換版面種子會不同', () => {
     const a = page({ seed: 9 }).b;
     const b = page({ seed: 9 }).b;

@@ -6,7 +6,7 @@ import { createCodebook, encodeTelegram, missingChars, substitutedChars, type Co
 import { renderCard } from './render/card.ts';
 import { renderLetter } from './render/letter.ts';
 import { fitNewspaperToContent, renderNewspaper } from './render/newspaper.ts';
-import { renderNewspaperFull, type FullPageRender } from './render/newspaper-full.ts';
+import { blockRect, renderNewspaperFull, type FullPageRender } from './render/newspaper-full.ts';
 import { applyPaperEffects } from './render/effects.ts';
 import { drawDecorations } from './render/decorations.ts';
 import { buildDecorationEditor } from './ui/decorations.ts';
@@ -760,8 +760,14 @@ function blockAtPoint(clientX: number, clientY: number): string | null {
   return index >= 0 ? (layout.blocks[index]?.id ?? null) : null;
 }
 
+let suppressBlockClick = false;
+
 els.stage.addEventListener('click', (event) => {
   closePopover();
+  if (suppressBlockClick) {
+    suppressBlockClick = false;
+    return;
+  }
   if (event.target instanceof Element && event.target.closest('.deco, .crop-overlay, .fx-hit')) return;
   if (state.active !== 'newspaper' || !lastFull) return;
   const target = event.target instanceof Element ? event.target.closest<HTMLElement>('.nr[data-region-id]') : null;
@@ -774,6 +780,80 @@ els.stage.addEventListener('click', (event) => {
   // 寬螢幕：表單欄捲回最上面，看得到區塊設定
   if (wideLayout.matches) els.editor.scrollTo({ top: 0, behavior: 'smooth' });
   setStatus('已選取一個區塊，設定在左邊表單最上方。');
+});
+
+// ---- 整版區塊：拖曳到另一個區塊上，換到那個位置（移動超過 8 像素才算拖曳，否則照常是點選） ----
+
+/** 區塊的排列順序（不含版面自動補空的填版素材）。 */
+function plannedOrder(): string[] {
+  return (lastFull?.blocks ?? []).map((x) => x.id);
+}
+
+function moveBlockTo(from: string, toId: string): void {
+  const order = plannedOrder();
+  // 放在自動補空的填版素材上：改成排在它前面最近的一個區塊之後（前面沒有就排在後面最近的一個之前）
+  let to = toId;
+  if (!order.includes(to)) {
+    const placed = (lastFull?.layout.blocks ?? []).map((x) => x.id);
+    const at = placed.indexOf(to);
+    const before = placed.slice(0, Math.max(0, at)).reverse().find((x) => order.includes(x) && x !== from);
+    const after = placed.slice(at + 1).find((x) => order.includes(x) && x !== from);
+    to = before ?? after ?? to;
+  }
+  const a = order.indexOf(from);
+  const z = order.indexOf(to);
+  if (a < 0 || z < 0 || a === z) return;
+  const next = order.filter((x) => x !== from);
+  next.splice(next.indexOf(to) + (a < z ? 1 : 0), 0, from);
+  const b = blockExtras();
+  selectedBlock = from;
+  commitBlocks({ ...b, order: next }, from);
+  setStatus('已把區塊移到新的位置；可以再拖曳，或在區塊設定裡用「往前」「往後」微調。');
+}
+
+els.stage.addEventListener('pointerdown', (event) => {
+  if (state.active !== 'newspaper' || !lastFull || event.button !== 0) return;
+  if (event.target instanceof Element && event.target.closest('.deco, .crop-overlay, .fx-hit, .popover')) return;
+  const region = event.target instanceof Element ? event.target.closest<HTMLElement>('.nr[data-region-id]') : null;
+  const from = region?.dataset['regionId'] ?? blockAtPoint(event.clientX, event.clientY);
+  // 自動補空的填版素材不在排列順序裡，不能拖曳（點一下照常可以選取）
+  if (!from || !plannedOrder().includes(from)) return;
+  const x0 = event.clientX;
+  const y0 = event.clientY;
+  let ghost: HTMLElement | null = null;
+  let over: string | null = null;
+  const mark = (id: string | null): void => {
+    els.stage.querySelector('.nr-drop-box')?.remove();
+    const target = id && id !== from ? lastFull?.layout.blocks.find((x) => x.id === id) : undefined;
+    const host = els.stage.querySelector('.nf-blocks');
+    if (!target || !host || !lastFull) return;
+    const r = blockRect(lastFull.geometry, target);
+    host.appendChild(h('div', { class: 'nr-drop-box', attrs: { 'aria-hidden': 'true' }, style: { left: `${r.x}mm`, top: `${r.y}mm`, width: `${r.w}mm`, height: `${r.h}mm` } }));
+  };
+  const move = (e: PointerEvent): void => {
+    if (!ghost && Math.hypot(e.clientX - x0, e.clientY - y0) < 8) return;
+    if (!ghost) {
+      ghost = h('div', { class: 'block-drag-ghost', attrs: { 'aria-hidden': 'true' }, text: '放到另一個區塊上，就換到那個位置' });
+      document.body.appendChild(ghost);
+      els.stage.classList.add('block-dragging');
+    }
+    ghost.style.setProperty('left', `${e.clientX + 14}px`);
+    ghost.style.setProperty('top', `${e.clientY + 14}px`);
+    over = blockAtPoint(e.clientX, e.clientY);
+    mark(over);
+  };
+  const up = (): void => {
+    window.removeEventListener('pointermove', move);
+    window.removeEventListener('pointerup', up);
+    if (!ghost) return;
+    ghost.remove();
+    els.stage.classList.remove('block-dragging');
+    mark(null);
+    suppressBlockClick = true;
+    if (over && over !== from) moveBlockTo(from, over);
+  };
+  window.addEventListener('pointermove', move);
+  window.addEventListener('pointerup', up);
 });
 
 // ---- 裝飾：拖曳移動、Alt＋滾輪縮放、Alt＋Shift＋滾輪旋轉（沒按 Alt 時滾輪一律捲動） ----

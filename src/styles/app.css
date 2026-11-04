@@ -737,3 +737,4 @@ textarea:focus-visible {
   border-color: rgb(31 90 160 / 0.7);
   background: rgb(31 90 160 / 0.1);
 }
+.fx-note { color: #8a4b00; }

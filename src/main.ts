@@ -14,7 +14,8 @@ import { buildFxEditor } from './ui/fx-items.ts';
 import { CLEARED_QUICK, fxStyle, shapeFromPolygon, sizeRange, type FxItem, type PlaceContext } from './lib/fx/catalog.ts';
 import { placeDecoration } from './lib/decorations.ts';
 import { measureMarks } from './render/effects.ts';
-import { PX_PER_MM, polygonBounds } from './lib/geometry.ts';
+import { PX_PER_MM, inflateRect, polygonBounds } from './lib/geometry.ts';
+import { planFxItem } from './lib/fx/plan.ts';
 import { parsePreviewZoom, previewScale, serializePreviewZoom, wheelDirection, zoomBy, type PreviewFit, type PreviewZoom, type Size } from './lib/preview.ts';
 import { applyPreset, pickConditions } from './props/conditions.ts';
 import { eraFontPatch, eraPatch, isEra } from './props/eras.ts';
@@ -345,9 +346,14 @@ function selectFx(id: string | null): void {
 }
 
 function fxEditor(kind: PropKind): HTMLElement {
+  const selected = state.extras[kind].effects.find((d) => d.id === selectedFx);
+  const paper = els.stage.querySelector<HTMLElement>('.paper');
+  const shrunk = selected && paper ? planFxItem(selected, { protect: measureMarks(paper, 'protect').map((r) => inflateRect(r, 1.2)) }).shrunk : false;
   return buildFxEditor({
     items: state.extras[kind].effects,
     selectedId: selectedFx,
+    current: () => state.extras[kind].effects,
+    note: shrunk ? '這一項碰到標了 [保:…] 的線索：挖掉的範圍已自動縮小（縮到太小就不挖洞），線索周圍也不畫污漬。移開一點就會恢復。' : null,
     place: fxPlaceContext,
     conditions: pickConditions(currentValues()),
     onChange(effects, redraw) {

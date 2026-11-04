@@ -28,6 +28,8 @@ import { h } from './dom.ts';
 
 export interface FxEditorOptions {
   readonly items: readonly FxItem[];
+  /** 目前最新的項目（拖曳、滾輪改過之後，設定面板要以這份為準）。 */
+  readonly current: () => readonly FxItem[];
   readonly selectedId: string | null;
   /** 紙張外框與保護區（擺放新項目用）。 */
   readonly place: () => PlaceContext;
@@ -39,6 +41,8 @@ export interface FxEditorOptions {
   onConvert(items: FxItem[]): void;
   /** 在預覽上畫自訂形狀（多邊形或手繪套索）。 */
   onDrawShape(id: string, tool: CropTool): void;
+  /** 選取中的項目碰到保護區而縮小或取消挖洞時的說明。 */
+  readonly note?: string | null;
 }
 
 /** 紙張狀況裡有沒有可以拆成個別項目的效果。 */
@@ -74,10 +78,13 @@ export function buildFxEditor(o: FxEditorOptions): HTMLElement {
   let items = [...o.items];
   const emit = (redraw: boolean): void => o.onChange([...items], redraw);
   const update = (id: string, patch: (d: FxItem) => FxItem, redraw = false): void => {
-    items = items.map((d) => (d.id === id ? patch(d) : d));
+    items = o.current().map((d) => (d.id === id ? patch(d) : d));
     emit(redraw);
   };
-  const topZ = (): number => (items.length ? Math.max(...items.map((x) => x.z)) + 1 : 0);
+  const topZ = (): number => {
+    const cur = o.current();
+    return cur.length ? Math.max(...cur.map((x) => x.z)) + 1 : 0;
+  };
 
   // 加一個、快速產生
   const kind = h('select', { attrs: { 'aria-label': '效果種類' } });
@@ -90,6 +97,7 @@ export function buildFxEditor(o: FxEditorOptions): HTMLElement {
   fillStyles();
   kind.addEventListener('change', fillStyles);
   const add = button('加一個', () => {
+    items = [...o.current()];
     if (items.length >= FX_LIMITS.items) return;
     const k = kind.value as FxKind;
     const seed = freshSeed();
@@ -103,6 +111,7 @@ export function buildFxEditor(o: FxEditorOptions): HTMLElement {
   const quick = button('快速產生', () => {
     const k = kind.value as FxKind;
     const count = Math.max(1, Math.min(30, Math.round(Number(n.value) || 1)));
+    items = [...o.current()];
     items = [...items, ...quickGenerate(k, styleSel.value, count, freshSeed(), o.place(), items, () => newId('x'))];
     emit(true);
   });
@@ -111,8 +120,9 @@ export function buildFxEditor(o: FxEditorOptions): HTMLElement {
   const convert = button(
     '把上面紙張狀況的效果拆成個別項目',
     () => {
-      const made = itemsFromConditions(o.conditions, o.place(), items, () => newId('x'));
-      o.onConvert([...items, ...made]);
+      const cur = o.current();
+      const made = itemsFromConditions(o.conditions, o.place(), cur, () => newId('x'));
+      o.onConvert([...cur, ...made]);
     },
     !convertible,
   );
@@ -150,6 +160,7 @@ export function buildFxEditor(o: FxEditorOptions): HTMLElement {
       'div',
       { class: 'fx-panel', attrs: { id: 'fx-panel' }, dataset: { fxId: d.id } },
       h('h3', { class: 'fx-panel-title', text: `選取中：${fxLabel(d)}` }),
+      o.note ? h('p', { class: 'form-hint fx-note', text: o.note }) : null,
       ...rows,
       h(
         'div',
@@ -157,16 +168,17 @@ export function buildFxEditor(o: FxEditorOptions): HTMLElement {
         button('換一個', () => update(d.id, (x) => ({ ...x, seed: freshSeed(x.seed) }))),
         ...shapeButtons,
         button('移到最上層', () => update(d.id, (x) => ({ ...x, z: topZ() }))),
-        button('移到最下層', () => update(d.id, (x) => ({ ...x, z: Math.min(...items.map((y) => y.z)) - 1 }))),
+        button('移到最下層', () => update(d.id, (x) => ({ ...x, z: Math.min(...o.current().map((y) => y.z)) - 1 }))),
         button('複製', () => {
-          if (items.length >= FX_LIMITS.items) return;
+          items = [...o.current()];
+    if (items.length >= FX_LIMITS.items) return;
           const copy: FxItem = { ...d, id: newId('x'), x: d.x + 6, y: d.y + 6, z: topZ(), seed: freshSeed(d.seed) };
           items = [...items, copy];
           emit(false);
           o.onSelect(copy.id);
         }),
         button('刪除', () => {
-          items = items.filter((x) => x.id !== d.id);
+          items = o.current().filter((x) => x.id !== d.id);
           emit(false);
           o.onSelect(null);
         }),
@@ -190,7 +202,7 @@ export function buildFxEditor(o: FxEditorOptions): HTMLElement {
           { class: ['fx-row', d.id === o.selectedId && 'fx-row-selected'], dataset: { fxId: d.id } },
           button(fxLabel(d), () => o.onSelect(d.id)),
           button('刪除', () => {
-            items = items.filter((x) => x.id !== d.id);
+            items = o.current().filter((x) => x.id !== d.id);
             emit(false);
             if (d.id === o.selectedId) o.onSelect(null);
             else o.onChange([...items], true);

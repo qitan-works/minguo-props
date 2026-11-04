@@ -331,14 +331,14 @@ const WATER_YELLOW: Rgb = [168, 128, 62];
 const WATER_GRAY: Rgb = [118, 122, 128];
 
 /** 水漬：洗淡、染色、乾掉後留下的潮線，以及字的暈開。 */
-function waterArea(c: Ctx, polys: readonly (readonly Point[])[], o: { tides?: number; bleed?: boolean } = {}): void {
+function waterArea(c: Ctx, polys: readonly (readonly Point[])[], o: { tides?: number; bleed?: boolean; wash?: number } = {}): void {
   const k = c.k;
   const strength = c.item.strength;
   const look = waterBleed(strength, c.tone < 0.5 ? 'brown' : 'blue');
   const stain = mix(WATER_YELLOW, WATER_GRAY, c.tone);
   const edge = mix([135, 96, 48], [88, 92, 98], c.tone);
-  if (o.bleed !== false && strength > 0) fillMany(c, polys, `rgb(250 244 228 / ${(look.wash * 0.85).toFixed(2)})`);
-  fillMany(c, polys, rgba(stain, 0.05 + 0.13 * k));
+  if (o.bleed !== false && strength > 0) fillMany(c, polys, `rgb(250 244 228 / ${(look.wash * (o.wash ?? 0.45)).toFixed(2)})`);
+  fillMany(c, polys, rgba(stain, 0.07 + 0.16 * k));
   for (const p of polys) {
     stroke(c, p, rgba(edge, 0.16 + 0.22 * k), 1.2, true);
     stroke(c, p, rgba(edge, 0.32 + 0.3 * k), 0.28, true);
@@ -358,7 +358,7 @@ function water(c: Ctx): void {
   const style = c.item.style;
   const custom = customShape(c, ir * 0.5);
   if (custom) {
-    waterArea(c, [custom], { tides: S > 8 ? 3 : 1 });
+    waterArea(c, [custom], { tides: S > 8 ? 3 : 1, wash: style === 'soak' ? 0.85 : 0.45 });
     if (style === 'soak') soaked(c, custom);
     return;
   }
@@ -380,9 +380,9 @@ function water(c: Ctx): void {
       const r = S * range(rng, 0.7, 1.25);
       const x = range(rng, -S * 4, S * 4);
       const y = range(rng, -S * 5, S * 5);
-      drops.push(teardrop(x, y, r, r * range(rng, 2.2, 4.2), -Math.PI / 2 + range(rng, -0.2, 0.2)));
-      // 淚水滑落留下的細痕
-      stroke(c, [{ x, y: y - r * 4 }, { x: x + range(rng, -0.4, 0.4), y: y - r * range(rng, 7, 12) }], rgba(mix(WATER_YELLOW, WATER_GRAY, c.tone), 0.12 + 0.12 * k), r * 0.5);
+      drops.push(teardrop(x, y, r, r * range(rng, 1.25, 1.8), -Math.PI / 2 + range(rng, -0.3, 0.3)));
+      // 淚水滑落留下的一道淡痕
+      fill(c, roundish(rng, r * 0.42, 0.4, 16, x + range(rng, -0.3, 0.3), y - r * range(rng, 2.6, 3.4), 1, 2.6), rgba(mix(WATER_YELLOW, WATER_GRAY, c.tone), 0.05 + 0.07 * k));
     }
     waterArea(c, drops, { tides: 0 });
   } else if (style === 'rain') {
@@ -409,7 +409,7 @@ function water(c: Ctx): void {
     }
   } else {
     const region = roundish(rng, S, Math.min(1, ir * 0.9 + 0.1), 72);
-    waterArea(c, [region], { tides: 3 });
+    waterArea(c, [region], { tides: 3, wash: 0.85 });
     soaked(c, region);
   }
 }
@@ -659,9 +659,9 @@ function spots(c: Ctx): void {
     const polys: Point[][] = [];
     for (let i = 0; i < c.count; i++) {
       const p = scatterIn(rng, S);
-      polys.push(roundish(rng, range(rng, 0.07, 0.3), ir, 8, p.x, p.y));
+      polys.push(roundish(rng, range(rng, 0.1, 0.42), ir, 8, p.x, p.y));
     }
-    fillMany(c, polys, rgba(dark, 0.35 + 0.5 * k));
+    fillMany(c, polys, rgba(dark, 0.5 + 0.45 * k));
   } else if (style === 'splash') {
     const tea = mix([155, 105, 45], [95, 60, 25], c.tone);
     const polys: Point[][] = [];
@@ -676,7 +676,7 @@ function spots(c: Ctx): void {
   } else {
     for (let i = 0; i < c.count; i++) {
       const p = scatterIn(rng, S * 0.6);
-      const r = S * range(rng, 0.35, 0.8);
+      const r = Math.min(20, S * range(rng, 0.35, 0.8));
       const blob = roundish(rng, r, Math.min(1, ir + 0.2), 28, p.x, p.y);
       fill(c, blob, rgba(fox1, 0.08 + 0.12 * k));
       fill(c, inset(blob, r * 0.3, rng, 0.3), rgba(fox0, 0.06 + 0.1 * k));
@@ -701,7 +701,7 @@ function mold(c: Ctx): void {
   if (style === 'colony') {
     for (let i = 0; i < c.count; i++) {
       const p = scatterIn(rng, S * 0.7);
-      const r = S * range(rng, 0.25, 0.6);
+      const r = Math.min(14, S * range(rng, 0.25, 0.6));
       fill(c, roundish(rng, r, Math.min(1, ir + 0.2), 28, p.x, p.y), rgba(halo, 0.06 + 0.1 * k));
       dots(p, r, Math.round(r * 4));
     }
@@ -721,7 +721,7 @@ function mold(c: Ctx): void {
     const white = mix([242, 242, 232], [200, 200, 192], c.tone);
     for (let i = 0; i < c.count; i++) {
       const p = scatterIn(rng, S * 0.7);
-      fill(c, roundish(rng, S * range(rng, 0.3, 0.6), Math.min(1, ir + 0.3), 24, p.x, p.y), rgba(white, 0.35 + 0.35 * k));
+      fill(c, roundish(rng, Math.min(12, S * range(rng, 0.3, 0.6)), Math.min(1, ir + 0.3), 24, p.x, p.y), rgba(white, 0.35 + 0.35 * k));
     }
     dots({ x: 0, y: 0 }, S * 0.6, Math.round(S * 3));
   }
@@ -800,8 +800,8 @@ function pin(c: Ctx): void {
     hole(0, 0, 0.45 * S);
   } else if (style === 'staple') {
     stroke(c, [{ x: -S / 2, y: 0 }, { x: S / 2, y: 0 }], rgba(mix([110, 100, 90], [140, 70, 25], c.tone), 0.15 + 0.15 * k), 0.55);
-    hole(-S / 2, 0, 0.28);
-    hole(S / 2, 0, 0.28);
+    hole(-S / 2, 0, 0.38);
+    hole(S / 2, 0, 0.38);
   } else if (style === 'torn') {
     const r = 0.5 * S;
     const len = 1.5 + k * 5;
@@ -924,13 +924,25 @@ function wax(c: Ctx): void {
     stroke(c, poly, rgba(rim, 0.75), 0.3, true);
     fill(c, roundish(rng, r * 0.35, 0.3, 12, hi.x, hi.y), rgba(light, 0.7));
   };
+  const arc = (cx: number, cy: number, r: number, a0: number, a1: number, n: number): Point[] => arcPoints(c, cx, cy, r, a0, a1, n);
+  /** 一滴蠟：上半是圓，往下流出一道逐漸變細的蠟淚，尾端一顆小蠟珠。 */
+  const drop = (x: number, y: number, r: number, len: number): Point[] => {
+    const neck = r * 0.32;
+    const tip = { x: x + range(rng, -0.3, 0.3) * r, y: y + r * 0.6 + len };
+    return [
+      ...arc(x, y, r, Math.PI * 0.62, Math.PI * 2.38, 22),
+      { x: x + neck, y: y + r * 0.95 },
+      { x: tip.x + neck * 0.55, y: tip.y - neck },
+      ...arc(tip.x, tip.y, neck * 0.9, 0, Math.PI, 6),
+      { x: tip.x - neck * 0.55, y: tip.y - neck },
+      { x: x - neck, y: y + r * 0.95 },
+    ];
+  };
   if (style === 'drip') {
     for (let i = 0; i < c.count; i++) {
       const p = scatterIn(rng, S * 4);
       const r = S * range(rng, 0.45, 1.3);
-      const len = range(rng, 2, 9) * (S / 3);
-      const shape = [...roundish(rng, r, ir * 0.4, 18, p.x, p.y).filter((q) => q.y <= p.y + r * 0.2), { x: p.x + r * 0.25, y: p.y + r + len }, { x: p.x, y: p.y + r + len + r * 0.35 }, { x: p.x - r * 0.25, y: p.y + r + len }];
-      blob(shape, { x: p.x - r * 0.3, y: p.y - r * 0.3 }, r);
+      blob(drop(p.x, p.y, r, range(rng, 1.2, 4) * r), { x: p.x - r * 0.3, y: p.y - r * 0.3 }, r);
     }
   } else if (style === 'pool') {
     const poly = roundish(rng, S, Math.min(1, ir + 0.2), 36);
@@ -956,7 +968,13 @@ function wax(c: Ctx): void {
       right.push({ x: x + w, y });
     }
     const tail = right[right.length - 1] as Point;
-    blob([...roundish(rng, S * 0.6, 0.2, 14).filter((q) => q.y <= 0), ...right, { x: tail.x - S * 0.22, y: L + S * 0.45 }, ...left.reverse()], { x: -S * 0.15, y: S * 0.2 }, S * 0.6);
+    const end = left[left.length - 1] as Point;
+    const bead = (tail.x - end.x) / 2;
+    blob(
+      [...arc(0, 0, S * 0.6, Math.PI, Math.PI * 2, 12), ...right, ...arc((tail.x + end.x) / 2, L, bead * 1.3, 0, Math.PI, 8), ...left.reverse()],
+      { x: -S * 0.15, y: -S * 0.2 },
+      S * 0.6,
+    );
     for (let i = 0; i < int(rng, 1, 3); i++) {
       const y = range(rng, 0.3, 0.8) * L;
       const r = S * range(rng, 0.2, 0.35);
@@ -965,8 +983,18 @@ function wax(c: Ctx): void {
   }
 }
 
+/** 圓弧（角度由 a0 到 a1，弧度；y 朝下所以 −π/2 是正上方），依不規則程度帶一點起伏。 */
+function arcPoints(c: Ctx, cx: number, cy: number, r: number, a0: number, a1: number, n: number): Point[] {
+  return Array.from({ length: n + 1 }, (_, i) => {
+    const a = a0 + ((a1 - a0) * i) / n;
+    const k = 1 + c.ir * 0.12 * Math.sin(a * 3 + c.seedPhase);
+    return { x: cx + Math.cos(a) * r * k, y: cy + Math.sin(a) * r * k };
+  });
+}
+
 function smudge(c: Ctx): void {
   const { S, ir, k, rng } = c;
+  const arc = (cx: number, cy: number, r: number, a0: number, a1: number, m: number): Point[] => arcPoints(c, cx, cy, r, a0, a1, m);
   const style = c.item.style;
   const ink = mix([25, 22, 20], [26, 36, 72], c.tone);
   const a = (c.item.rotate * Math.PI) / 180;
@@ -987,20 +1015,26 @@ function smudge(c: Ctx): void {
     }
     bleed([poly], 0.2 + 0.4 * k, 0.85, 0.2 * k);
   } else if (style === 'drag') {
+    // 手指按下去（左端圓頭最濃）再往右拖，越拖越淡、越細，上下緣不整齊
     const L = S * 3.2;
+    const n = 18;
+    const wt = walk(rng, n + 1, 0.7);
+    const wb = walk(rng, n + 1, 0.7);
     const top: Point[] = [];
     const bottom: Point[] = [];
-    for (let i = 0; i <= 14; i++) {
-      const t = i / 14;
-      const w = (S / 2) * (1 - 0.7 * t) * (1 + gaussianish(rng) * 0.15 * ir);
-      top.push({ x: -L / 2 + L * t, y: -w });
-      bottom.push({ x: -L / 2 + L * t, y: w });
+    for (let i = 0; i <= n; i++) {
+      const t = i / n;
+      const w = (S / 2) * (1 - 0.72 * Math.pow(t, 1.3));
+      top.push({ x: -L / 2 + L * t, y: -w * (1 + (wt[i] as number) * 0.3 * (0.3 + ir)) });
+      bottom.push({ x: -L / 2 + L * t, y: w * (1 + (wb[i] as number) * 0.3 * (0.3 + ir)) });
     }
-    const poly = [...top, ...bottom.reverse()];
-    fill(c, poly, rgba(ink, 0.1 + 0.18 * k));
-    for (let i = 0; i < 5; i++) {
-      const y = range(rng, -S * 0.35, S * 0.35);
-      stroke(c, [{ x: -L / 2 + range(rng, 0, L * 0.2), y }, { x: L / 2 - range(rng, 0, L * 0.4), y: y * 0.4 }], rgba(ink, 0.08 + 0.1 * k), 0.25);
+    const poly = [...arc(-L / 2, 0, S / 2, Math.PI / 2, Math.PI * 1.5, 10), ...top, ...bottom.reverse()];
+    fill(c, poly, rgba(ink, 0.06 + 0.1 * k));
+    fill(c, roundish(rng, S * 0.42, ir, 20, -L / 2 + S * 0.2, 0), rgba(ink, 0.08 + 0.12 * k));
+    for (let i = 0; i < 7; i++) {
+      const y = range(rng, -S * 0.38, S * 0.38);
+      const x0 = -L / 2 + range(rng, 0, L * 0.25);
+      stroke(c, [{ x: x0, y }, { x: x0 + L * range(rng, 0.35, 0.7), y: y * range(rng, 0.3, 0.7) }], rgba(ink, 0.05 + 0.08 * k), range(rng, 0.15, 0.45));
     }
     // 字被拖著抹開：錯開兩次的複製品
     bleed([poly], 0.25, 0.55 + 0.25 * k, 0.15 * k, Math.cos(a) * 0.9, Math.sin(a) * 0.9);

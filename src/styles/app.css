@@ -738,6 +738,7 @@ textarea:focus-visible {
   background: rgb(31 90 160 / 0.1);
 }
 .fx-note { color: #8a4b00; }
+
 /* ---------- 整版區塊拖曳換位置 ---------- */
 
 .block-dragging {
@@ -763,6 +764,8 @@ textarea:focus-visible {
   color: #fff;
   font-size: 0.8rem;
   pointer-events: none;
+}
+
 /* ---------- 第五版：線索包 ---------- */
 
 .pack-editor .pack-buttons {

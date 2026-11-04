@@ -21,6 +21,7 @@ import { FONTS, type FontsourceFont, type GeneratedFont } from '../src/fonts.ts'
 import { readManifest, type FontManifest, type ManifestFont } from './lib/font-manifest.ts';
 import { MODIFIED_DATE, PROJECT_URL } from './lib/font-sources.ts';
 import { generatedFontCss, rewriteFontCss } from './lib/fonts.ts';
+import { checkCss } from './lib/css-check.ts';
 import { findRootUrls, kindOf } from './lib/relative-urls.ts';
 import { buildVersion, checkVersionedRefs, contentHash, fileHash, versionFontUrls, versionIndexHtml } from './lib/version.ts';
 
@@ -201,7 +202,18 @@ async function assertRelativeUrls(): Promise<void> {
   }
 }
 
+/** CSS 的大括號要成對、不准有巢狀規則（少一個 } 時瀏覽器不報錯，後面的樣式會整段悄悄失效）。 */
+async function assertCss(): Promise<void> {
+  const dir = path.join(root, 'src', 'styles');
+  const problems: string[] = [];
+  for (const name of (await readdir(dir)).filter((f) => f.endsWith('.css')).sort()) {
+    for (const p of checkCss(await readFile(path.join(dir, name), 'utf8'))) problems.push(`  src/styles/${name}:${p.line}  ${p.message}`);
+  }
+  if (problems.length) throw new Error(`CSS 的結構有問題，建置中止：\n${problems.join('\n')}`);
+}
+
 async function main(): Promise<void> {
+  await assertCss();
   await rm(dist, { recursive: true, force: true });
 
   run(process.execPath, [path.join(root, 'node_modules', 'typescript', 'bin', 'tsc'), '-p', 'tsconfig.build.json']);

@@ -334,7 +334,7 @@ BASE=/minguo-props/ pnpm serve
 | --- | --- |
 | `pnpm typecheck` | TypeScript 型別檢查（strict） |
 | `pnpm test` | 以 Node 內建的 `node --test` 測試純邏輯：電碼查詢、民國紀年、中文數字、韻目代日、存檔格式、亂數種子、剪線與切片幾何、整版排版、保護區判斷、字型清單與授權一致性、字數檢查、字型分片與 unicode-range、ZIP、tar、WOFF2 與 WOFF 1.0 解析、網址都是相對路徑等 |
-| `pnpm build` | 編譯並輸出靜態網站到 `dist/`；產物裡只要有以「/」開頭的網址就中止 |
+| `pnpm build` | 編譯並輸出靜態網站到 `dist/`（網站的 JS、CSS 與資料在 `dist/v/<版本>/`，見「部署與瀏覽器快取」）；產物裡只要有以「/」開頭的網址、或沒有加版本的引用就中止 |
 | `pnpm serve` | 只綁定 127.0.0.1 的本機預覽伺服器（提供 `dist/`；`BASE` 環境變數可指定子路徑） |
 | `pnpm data:telegraph` | 從 unicode.org 下載 `Unihan.zip` 並重新產生 `src/data/telegraph.json` 與 `src/data/big5-level1.json` |
 | `pnpm data:check` | 重新產生並與已提交的電碼資料比對（不寫入） |
@@ -359,6 +359,32 @@ BASE=/minguo-props/ pnpm serve
 
 工作流程預設不給任何權限，每個 job 只拿自己需要的；不使用任何機密，checkout 設 `persist-credentials: false`，
 每個 action 都以完整 commit SHA 釘選並註明版本。部署不加任何分析或追蹤，頁面的 Content-Security-Policy 與本機相同。
+
+### 部署與瀏覽器快取
+
+GitHub Pages 對所有檔案都送 `Cache-Control: max-age=600`（快取 10 分鐘），網站又是幾十個各自快取的
+ES 模組、CSS、字型與資料檔。如果檔名固定，部署後 10 分鐘內重新整理仍可能拿到舊的 `js/main.js`；
+更糟的是部分檔案過期、部分沒有時，新舊模組會混在一起載入，import 對不上就壞掉。
+
+所以 `pnpm build` 讓每次部署的資源網址都不同（`scripts/lib/version.ts`）：
+
+- 網站自己的 JS、CSS、`fonts.css` 與 `data/telegraph.json` 都放在 `dist/v/<版本>/` 底下，
+  `index.html` 是唯一不帶版本的入口，指向那個資料夾。版本是 commit 與網站內容一起算的雜湊（12 碼），
+  不同 commit 一定不同，同一份內容重建得到相同的。
+- 模組之間的 import 本來就是相對路徑，所以一定指到同一版；電碼表改用相對於模組的網址讀取（`import.meta.url`）。
+  新的 `index.html` 整套載入新版，還在快取裡的舊 `index.html` 整套載入舊版，不會混用。
+- 字型檔（幾十 MB、很少變）留在 `dist/fonts/`，不放進版本資料夾：`fonts.css` 裡每個字型檔的網址都加上
+  那個檔案自己內容的雜湊（`?v=…`），內容沒變的部署之間繼續用快取，內容變了網址就跟著變；
+  引用它們的 `fonts.css` 本身在版本資料夾裡。
+- 建置的最後會檢查：網站自己的 JS、CSS、資料檔只要有一個不是從版本資料夾引用、或字型網址沒有雜湊，就中止建置。
+- 不用 Service Worker（不另外引入一層快取狀態），Content-Security-Policy 不變，一律相對路徑，子路徑 `/minguo-props/` 照常運作。
+
+**部署後多久看到新版**：`index.html` 本身仍會被快取最多 10 分鐘，所以部署後最多約 10 分鐘，重新整理就會載入整套新版；
+想立刻看到，可以強制重新整理（Windows／Linux 按 Ctrl＋Shift＋R，Mac 按 Cmd＋Shift＋R）。
+
+已知的限制：Pages 只保留最新一次部署，舊的版本資料夾在伺服器上就不存在了。
+如果瀏覽器還留著舊的 `index.html`、卻剛好少了舊版的某個檔案（這些檔案通常是開網頁時一起快取的，很少發生），
+那個檔案會讀不到而無法開啟；等 `index.html` 過期（最多 10 分鐘）或強制重新整理就好。這種情況也不會新舊混用。
 
 ### 專案結構
 

@@ -2,9 +2,16 @@
 // 字型有兩種來源：Fontsource 套件（node_modules）與 pnpm fonts:generate 產生、提交在 fonts/ 的字型。
 // 兩種都會驗證實際複製的字型檔的數量與 SHA-256（登記在 src/fonts.ts），不符就中止建置。
 // 產出的 dist/ 是純靜態網站，放到任何靜態伺服器即可使用。
+//
+// 部署版本（見 scripts/lib/version.ts）：網站自己的 JS、CSS、fonts.css 與 data/ 放在 dist/v/<版本>/，
+// index.html 是唯一不帶版本的入口；字型檔留在 dist/fonts/，網址加上各自內容的雜湊。
+//   dist/index.html
+//   dist/v/<版本>/js/…、css/…、data/telegraph.json、fonts.css
+//   dist/fonts/<字型>/*.woff2（網址帶 ?v=<內容雜湊>）、LICENSE.txt、SOURCE.txt
+//   dist/licenses/…
 
 import { spawnSync } from 'node:child_process';
-import { copyFile, mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -15,6 +22,7 @@ import { readManifest, type FontManifest, type ManifestFont } from './lib/font-m
 import { MODIFIED_DATE, PROJECT_URL } from './lib/font-sources.ts';
 import { generatedFontCss, rewriteFontCss } from './lib/fonts.ts';
 import { findRootUrls, kindOf } from './lib/relative-urls.ts';
+import { buildVersion, checkVersionedRefs, contentHash, fileHash, versionFontUrls, versionIndexHtml } from './lib/version.ts';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const dist = path.join(root, 'dist');
@@ -110,15 +118,53 @@ async function buildGeneratedFont(font: GeneratedFont, manifest: FontManifest): 
   ];
 }
 
-async function buildFonts(): Promise<void> {
+/** 複製字型檔到 dist/fonts/，回傳 fonts.css 的內容（字型網址帶各自內容的雜湊，fonts.css 放在版本資料夾）。 */
+async function buildFonts(): Promise<string> {
   const manifest = await readManifest(path.join(root, 'fonts'));
   const parts: string[] = [
-    '/* 由 scripts/build.ts 產生。字型各依其授權條款散布（SIL OFL 1.1 或 GPL-2.0-or-later），見 ../licenses/ 與各字型目錄的 LICENSE.txt。 */',
+    '/* 由 scripts/build.ts 產生。字型各依其授權條款散布（SIL OFL 1.1 或 GPL-2.0-or-later），見 ../../licenses/ 與各字型目錄的 LICENSE.txt。 */',
   ];
   for (const font of FONTS) {
     parts.push(...(font.source === 'fontsource' ? await buildFontsourceFont(font) : await buildGeneratedFont(font, manifest)));
   }
-  await writeFile(path.join(dist, 'fonts', 'fonts.css'), `${parts.join('\n\n')}\n`, 'utf8');
+  const hashes = new Map<string, string>();
+  for (const entry of await readdir(path.join(dist, 'fonts'), { withFileTypes: true, recursive: true })) {
+    if (!entry.isFile() || !/\.woff2?$/.test(entry.name)) continue;
+    hashes.set(`${path.basename(entry.parentPath)}/${entry.name}`, fileHash(await readFile(path.join(entry.parentPath, entry.name))));
+  }
+  return versionFontUrls(`${parts.join('\n\n')}\n`, (dir, file) => {
+    const h = hashes.get(`${dir}/${file}`);
+    if (!h) throw new Error(`fonts.css 引用的字型檔不存在：${dir}/${file}`);
+    return h;
+  });
+}
+
+/** 目前的 commit（GitHub Actions 的 GITHUB_SHA，或本機的 git）；都沒有時是空字串。 */
+function commitId(): string {
+  const env = process.env['GITHUB_SHA'];
+  if (env) return env;
+  const result = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' });
+  return result.status === 0 ? result.stdout.trim() : '';
+}
+
+async function readTree(dir: string, base = dir): Promise<Map<string, Buffer>> {
+  const out = new Map<string, Buffer>();
+  for (const entry of await readdir(dir, { withFileTypes: true, recursive: true })) {
+    if (!entry.isFile()) continue;
+    const file = path.join(entry.parentPath, entry.name);
+    out.set(path.relative(base, file).split(path.sep).join('/'), await readFile(file));
+  }
+  return out;
+}
+
+/** 建置後檢查：網站自己的 JS、CSS、資料檔都只從版本資料夾引用，字型網址都帶內容雜湊。 */
+async function assertVersioned(version: string): Promise<void> {
+  const files = new Map<string, string>();
+  for (const [name, data] of await readTree(dist)) if (/\.(?:html|css|m?js)$/.test(name)) files.set(name, data.toString('utf8'));
+  const problems = checkVersionedRefs(files, version);
+  if (problems.length > 0) {
+    throw new Error(`dist/ 裡有沒有加版本的引用，部署後瀏覽器可能把新舊檔案混在一起用：\n${problems.map((p) => `  ${p.file}  ${p.match}`).join('\n')}`);
+  }
 }
 
 async function copyDir(from: string, to: string, filter: (name: string) => boolean): Promise<void> {
@@ -160,19 +206,27 @@ async function main(): Promise<void> {
 
   run(process.execPath, [path.join(root, 'node_modules', 'typescript', 'bin', 'tsc'), '-p', 'tsconfig.build.json']);
 
-  await copyInto(path.join(root, 'src', 'index.html'), path.join(dist, 'index.html'));
-  await copyDir(path.join(root, 'src', 'styles'), path.join(dist, 'css'), (n) => n.endsWith('.css'));
-  await copyInto(path.join(root, 'src', 'data', 'telegraph.json'), path.join(dist, 'data', 'telegraph.json'));
-  await buildFonts();
+  // 網站自己的檔案先放在暫存資料夾，算出版本後整個改名成 v/<版本>/
+  const stage = path.join(dist, '.stage');
+  await mkdir(stage, { recursive: true });
+  await rename(path.join(dist, 'js'), path.join(stage, 'js'));
+  await copyDir(path.join(root, 'src', 'styles'), path.join(stage, 'css'), (n) => n.endsWith('.css'));
+  await copyInto(path.join(root, 'src', 'data', 'telegraph.json'), path.join(stage, 'data', 'telegraph.json'));
+  await writeFile(path.join(stage, 'fonts.css'), await buildFonts(), 'utf8');
+  const version = buildVersion(commitId(), contentHash(await readTree(stage)));
+  await mkdir(path.join(dist, 'v'), { recursive: true });
+  await rename(stage, path.join(dist, 'v', version));
+  await writeFile(path.join(dist, 'index.html'), versionIndexHtml(await readFile(path.join(root, 'src', 'index.html'), 'utf8'), version), 'utf8');
 
   await copyInto(path.join(root, 'LICENSE'), path.join(dist, 'licenses', 'LICENSE.txt'));
   await copyInto(path.join(root, 'THIRD_PARTY_NOTICES.md'), path.join(dist, 'licenses', 'THIRD_PARTY_NOTICES.txt'));
   await copyDir(path.join(root, 'licenses'), path.join(dist, 'licenses'), (n) => n.endsWith('.txt'));
 
   await assertRelativeUrls();
+  await assertVersioned(version);
 
   const { files, bytes } = await dirSize(dist);
-  console.log(`建置完成：dist/（${files} 個檔案，${(bytes / 1024 / 1024).toFixed(1)} MB）`);
+  console.log(`建置完成：dist/（${files} 個檔案，${(bytes / 1024 / 1024).toFixed(1)} MB），版本 v/${version}/`);
 }
 
 main().catch((err: unknown) => {

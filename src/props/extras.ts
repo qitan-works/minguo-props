@@ -84,6 +84,7 @@ export interface ExtrasState {
   readonly letter: PropExtras;
   readonly card: PropExtras;
   readonly relic: PropExtras;
+  readonly document: PropExtras;
 }
 
 export const LIMITS = {
@@ -106,6 +107,7 @@ export function defaultExtras(): ExtrasState {
     letter: { ...empty },
     card: { ...empty },
     relic: { ...empty },
+    document: { ...empty },
   };
 }
 
@@ -237,6 +239,7 @@ export function sanitizeExtras(input: unknown, labels: Readonly<Record<keyof Ext
       letter: sanitizeCommon(part('letter'), labels.letter, warnings),
       card: sanitizeCommon(part('card'), labels.card, warnings),
       relic: sanitizeCommon(part('relic'), labels.relic, warnings),
+      document: sanitizeCommon(part('document'), labels.document, warnings),
     },
     warnings,
   };

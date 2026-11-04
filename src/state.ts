@@ -13,6 +13,7 @@
 
 import { cardDefaults, cardFields, type CardData } from './props/card.ts';
 import { relicDefaults, relicFields, type RelicData } from './props/relic.ts';
+import { documentDefaults, documentFields, type DocumentData } from './props/document.ts';
 import { compactExtras, defaultExtras, sanitizeExtras, type ExtrasState } from './props/extras.ts';
 import { letterDefaults, letterFields, type LetterData } from './props/letter.ts';
 import { newspaperDefaults, newspaperFields, type NewspaperData } from './props/newspaper.ts';
@@ -25,7 +26,7 @@ export const SAVE_VERSION = 2;
 /** 匯入檔大小上限（字元數），照片以 data URL 存放，所以留得寬一些。 */
 export const MAX_SAVE_LENGTH = 32 * 1024 * 1024;
 
-export const PROP_KINDS = ['newspaper', 'telegram', 'letter', 'card', 'relic'] as const;
+export const PROP_KINDS = ['newspaper', 'telegram', 'letter', 'card', 'relic', 'document'] as const;
 export type PropKind = (typeof PROP_KINDS)[number];
 
 export const PROP_LABELS: Readonly<Record<PropKind, string>> = {
@@ -34,6 +35,7 @@ export const PROP_LABELS: Readonly<Record<PropKind, string>> = {
   letter: '信箋',
   card: '名片／請帖',
   relic: '古物',
+  document: '日常文件',
 };
 
 export interface PropsState {
@@ -42,6 +44,7 @@ export interface PropsState {
   readonly letter: LetterData;
   readonly card: CardData;
   readonly relic: RelicData;
+  readonly document: DocumentData;
 }
 
 export interface AppState {
@@ -56,6 +59,7 @@ export const PROP_FIELDS: { readonly [K in PropKind]: readonly Field[] } = {
   letter: letterFields,
   card: cardFields,
   relic: relicFields,
+  document: documentFields,
 };
 
 export function defaultState(): AppState {
@@ -67,6 +71,7 @@ export function defaultState(): AppState {
       letter: { ...letterDefaults },
       card: { ...cardDefaults },
       relic: { ...relicDefaults },
+      document: { ...documentDefaults },
     },
     extras: defaultExtras(),
   };
@@ -152,6 +157,7 @@ export function parseSaveObject(input: unknown): ParseResult {
     letter: load('letter', letterFields, letterDefaults),
     card: load('card', cardFields, cardDefaults),
     relic: load('relic', relicFields, relicDefaults),
+    document: load('document', documentFields, documentDefaults),
   };
 
   const extrasResult = sanitizeExtras(input['extras'], PROP_LABELS);

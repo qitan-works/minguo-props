@@ -68,6 +68,8 @@ export interface PlanInput {
   readonly crop: Polygon | null;
   /** 同一頁有多張紙（名片拼版）時，讓每張的隨機效果不同。 */
   readonly variant?: number;
+  /** 有逐一放置的燒穿項目時，必毀區也用燒洞（與燒過的紙一致）。 */
+  readonly burnItems?: boolean;
 }
 
 export interface Ellipse {
@@ -548,7 +550,7 @@ export function planEffects(input: PlanInput): EffectPlan {
   // 3. 必毀區：在那裡放燒洞、浸水模糊或墨跡
   const smudges: Point[][] = [];
   const blots: Point[][] = [];
-  const burnTargets = edge === 'burnt' || s.burnHoles > 0;
+  const burnTargets = edge === 'burnt' || s.burnHoles > 0 || input.burnItems === true;
   {
     const rng = rngOf('destroy');
     for (const target of input.destroy) {

@@ -667,3 +667,162 @@ textarea:focus-visible {
 .btn-danger {
   color: var(--ui-error);
 }
+
+/* ---------- 第五版：特效項目編輯器 ---------- */
+
+.fx-editor .deco-add {
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.fx-editor .deco-add input[type='number'] {
+  width: 4.5em;
+}
+
+.fx-panel {
+  display: grid;
+  gap: 4px;
+  margin: 8px 0;
+  padding: 8px;
+  border: 1px solid rgb(31 90 160 / 0.45);
+  border-radius: 4px;
+  background: rgb(31 90 160 / 0.05);
+}
+
+.fx-panel-title {
+  margin: 0 0 4px;
+  font-size: 0.95rem;
+}
+
+.fx-panel .deco-slider {
+  grid-template-columns: 7.5em 1fr 4.5em;
+}
+
+.fx-tone-ends {
+  display: flex;
+  justify-content: space-between;
+  margin: -2px 4.5em 2px 7.5em;
+  color: var(--ui-muted, #666);
+  font-size: 0.75rem;
+}
+
+.fx-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.fx-list {
+  display: grid;
+  gap: 2px;
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+  max-height: 16em;
+  overflow-y: auto;
+}
+
+.fx-row {
+  display: flex;
+  gap: 4px;
+}
+
+.fx-row > .btn:first-child {
+  flex: 1;
+  text-align: left;
+}
+
+.fx-row-selected > .btn:first-child {
+  border-color: rgb(31 90 160 / 0.7);
+  background: rgb(31 90 160 / 0.1);
+}
+.fx-note { color: #8a4b00; }
+/* ---------- 整版區塊拖曳換位置 ---------- */
+
+.block-dragging {
+  user-select: none;
+  cursor: grabbing;
+}
+
+.nr-drop-box {
+  position: absolute;
+  z-index: 6;
+  outline: 2px dashed rgb(31 90 160 / 0.85);
+  outline-offset: -2px;
+  background: rgb(31 90 160 / 0.1);
+  pointer-events: none;
+}
+
+.block-drag-ghost {
+  position: fixed;
+  z-index: 50;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: rgb(31 90 160 / 0.9);
+  color: #fff;
+  font-size: 0.8rem;
+  pointer-events: none;
+/* ---------- 第五版：線索包 ---------- */
+
+.pack-editor .pack-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 4px 0;
+}
+
+.pack-list {
+  display: grid;
+  gap: 6px;
+  margin: 6px 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pack-row {
+  display: grid;
+  gap: 3px;
+  padding: 6px 0;
+  border-top: 1px dashed var(--ui-line);
+}
+
+.pack-head {
+  display: flex;
+  gap: 0.6em;
+  font-size: 0.9rem;
+}
+
+.pack-url {
+  width: 100%;
+  font-size: 0.8rem;
+}
+
+.pack-stage {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.pack-dialog {
+  max-width: 28rem;
+  padding: 16px 20px;
+  border: 1px solid var(--ui-line);
+  border-radius: 6px;
+}
+
+.pack-dialog h2 {
+  margin: 0 0 8px;
+  font-size: 1.05rem;
+}
+
+.pack-dialog-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.pack-shared {
+  color: #8a4b00;
+}

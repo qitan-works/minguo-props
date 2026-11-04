@@ -5,6 +5,7 @@ import type { FillerItem } from '../data/fillers.ts';
 import type { Point } from '../lib/geometry.ts';
 import { EMPTY_BLOCK_EXTRAS, sanitizeBlockExtras, type BlockExtras } from '../lib/newspaper/blockstyle.ts';
 import { isValidSeed } from '../lib/random.ts';
+import { FX_LIMITS, compactFxItem, sanitizeFxItem, type FxItem } from '../lib/fx/catalog.ts';
 
 export const NEWS_ITEM_KINDS = [
   { value: 'short', label: '短訊' },
@@ -65,6 +66,8 @@ export interface PropExtras {
   /** 自由裁切的多邊形（紙面座標，公釐）；null 表示不裁切。 */
   readonly crop: readonly Point[] | null;
   readonly decorations: readonly Decoration[];
+  /** 第五版：逐一放置的紙張效果（燒洞、水漬、撕口…）。 */
+  readonly effects: readonly FxItem[];
 }
 
 export interface NewspaperExtras extends PropExtras {
@@ -80,6 +83,8 @@ export interface ExtrasState {
   readonly telegram: PropExtras;
   readonly letter: PropExtras;
   readonly card: PropExtras;
+  readonly relic: PropExtras;
+  readonly document: PropExtras;
 }
 
 export const LIMITS = {
@@ -95,12 +100,14 @@ export const LIMITS = {
 } as const;
 
 export function defaultExtras(): ExtrasState {
-  const empty: PropExtras = { crop: null, decorations: [] };
+  const empty: PropExtras = { crop: null, decorations: [], effects: [] };
   return {
     newspaper: { ...empty, items: [], locked: [], removed: [], blocks: EMPTY_BLOCK_EXTRAS },
     telegram: { ...empty },
     letter: { ...empty },
     card: { ...empty },
+    relic: { ...empty },
+    document: { ...empty },
   };
 }
 
@@ -208,7 +215,8 @@ function sanitizeCommon(v: Record<string, unknown>, label: string, warnings: str
     if (crop === null) warnings.push(`${label}的裁切範圍格式不符，已取消裁切。`);
   }
   const decorations = sanitizeList(v['decorations'], LIMITS.decorations, sanitizeDecoration, `${label}的裝飾`, warnings);
-  return { crop, decorations };
+  const effects = sanitizeList(v['effects'], FX_LIMITS.items, sanitizeFxItem, `${label}的特效項目`, warnings);
+  return { crop, decorations, effects };
 }
 
 export function sanitizeExtras(input: unknown, labels: Readonly<Record<keyof ExtrasState, string>>): { extras: ExtrasState; warnings: string[] } {
@@ -230,6 +238,8 @@ export function sanitizeExtras(input: unknown, labels: Readonly<Record<keyof Ext
       telegram: sanitizeCommon(part('telegram'), labels.telegram, warnings),
       letter: sanitizeCommon(part('letter'), labels.letter, warnings),
       card: sanitizeCommon(part('card'), labels.card, warnings),
+      relic: sanitizeCommon(part('relic'), labels.relic, warnings),
+      document: sanitizeCommon(part('document'), labels.document, warnings),
     },
     warnings,
   };
@@ -246,4 +256,14 @@ let counter = 0;
 export function newId(prefix: string): string {
   counter = (counter + 1) % 1000;
   return `${prefix}${Date.now().toString(36)}${counter.toString(36)}`;
+}
+
+/** 存檔用：特效項目只存與樣式預設值不同的欄位（見 compactFxItem），其餘照原樣。 */
+export function compactExtras(extras: ExtrasState): Record<keyof ExtrasState, unknown> {
+  const out = {} as Record<keyof ExtrasState, unknown>;
+  for (const key of Object.keys(extras) as (keyof ExtrasState)[]) {
+    const e: PropExtras = extras[key];
+    out[key] = { ...e, effects: e.effects.map(compactFxItem) };
+  }
+  return out;
 }

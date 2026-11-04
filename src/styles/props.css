@@ -1519,3 +1519,695 @@
     cursor: pointer;
   }
 }
+
+/* ---------- 逐一放置的特效項目（src/render/fx-items.ts） ---------- */
+
+.fx-clipdefs {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+
+.fx-hit-layer {
+  position: absolute;
+  z-index: 5;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.fx-hit-area,
+.fx-hit-dot {
+  fill: transparent;
+}
+
+.fx-hit-edge {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 3;
+}
+
+.fx-hit-frame {
+  fill: none;
+  stroke: none;
+  pointer-events: none;
+}
+
+@media screen {
+  .fx-hit {
+    cursor: move;
+  }
+
+  .fx-hit-area,
+  .fx-hit-dot {
+    pointer-events: all;
+  }
+
+  .fx-hit-edge {
+    pointer-events: stroke;
+  }
+
+  .fx-hit:hover .fx-hit-frame {
+    stroke: rgb(31 90 160 / 0.4);
+    stroke-width: 1px;
+    stroke-dasharray: 3 3;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .fx-hit-selected .fx-hit-frame {
+    stroke: rgb(31 90 160 / 0.85);
+    stroke-width: 1px;
+    stroke-dasharray: 4 3;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .fx-hit-selected .fx-hit-dot {
+    fill: rgb(31 90 160 / 0.45);
+  }
+/* 直式報頭（照民初報紙）：英文報名橫排粗體大寫、號數與定價各在一個框裡 */
+.nf-mh > .nf-mh-en-block {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-align: center;
+}
+
+.nf-mh > .nf-mh-cell {
+  box-sizing: border-box;
+  border: 0.25mm solid currentColor;
+  text-align: center;
+  letter-spacing: 0.08em;
+}
+
+/* 頂部橫排報頭左右的報耳 */
+.nf-mh > .nf-mh-ear {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  padding: 0.6mm 0.8mm;
+  border: 0.3mm solid currentColor;
+  white-space: normal;
+}
+
+.nf-mh-ear-head {
+  flex: none;
+  padding-bottom: 0.4mm;
+  border-bottom: 0.2mm solid currentColor;
+  font-family: var(--f-title);
+  font-weight: 700;
+/* ---------- 古物（第五版）：古籍殘頁、碑文拓片、符籙（src/render/relic.ts） ---------- */
+
+.paper.stock-book {
+  --paper-base: #ecdcb8;
+}
+
+.paper.stock-xuan {
+  --paper-base: #efe8d9;
+}
+
+.paper.stock-talisman {
+  --paper-base: #e6bf45;
+  background-image: radial-gradient(ellipse at 30% 20%, rgb(255 230 140 / 0.35), transparent 60%), radial-gradient(ellipse at 70% 80%, rgb(170 120 20 / 0.18), transparent 65%);
+}
+
+.rl {
+  position: absolute;
+  inset: 0;
+}
+
+.rl-svg {
+/* ---------- 民國日常文件（第五版，src/render/document.ts） ---------- */
+
+.paper.stock-ticket {
+  --paper-base: #efe4c8;
+}
+
+.paper.stock-ticket-green {
+  --paper-base: #dfe6cf;
+}
+
+.paper.stock-pawn {
+  --paper-base: #e9dcc0;
+}
+
+.paper.stock-deed {
+  --paper-base: #ead7b0;
+}
+
+.paper.stock-form {
+  --paper-base: #f1ead9;
+}
+
+.paper.stock-envelope {
+  --paper-base: #e6d2a8;
+}
+
+.dc {
+  position: absolute;
+  inset: 0;
+  color: #221a12;
+}
+
+.dc > div,
+.dc > svg {
+  position: absolute;
+  box-sizing: border-box;
+}
+
+.dc-vt {
+  writing-mode: vertical-rl;
+  text-orientation: upright;
+  line-height: 1.15;
+  letter-spacing: 0.06em;
+  overflow: hidden;
+}
+
+.dc-hand {
+  font-family: var(--f-hand);
+  color: #1d2340;
+}
+
+.dc-label {
+  font-family: var(--f-title);
+}
+
+.dc-small {
+  font-family: var(--f-body);
+  opacity: 0.85;
+}
+
+.dc-red {
+  color: rgb(176 30 24);
+}
+
+.dc-no {
+  font-family: var(--f-masthead);
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+
+.dc-rule {
+  border-top: 0.3mm solid currentColor;
+}
+
+.dc-frame {
+  border: 0.5mm solid currentColor;
+}
+
+.dc-frame-double {
+  border: 1.4mm double currentColor;
+}
+
+.dc-frame-deed {
+  border: 2mm double rgb(150 40 30 / 0.85);
+  box-shadow: inset 0 0 0 1.4mm var(--paper-base), inset 0 0 0 1.8mm rgb(150 40 30 / 0.6);
+}
+
+.dc-stamp {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgb(186 34 26 / 0.9);
+  font-family: var(--f-masthead);
+  filter: url('#f-ink');
+}
+
+.dc-stamp-round {
+  border: 0.7mm solid currentColor;
+  border-radius: 50%;
+}
+
+.dc-stamp-square {
+  border: 0.8mm solid currentColor;
+}
+
+.dc-stamp-grid {
+  writing-mode: vertical-rl;
+  text-orientation: upright;
+  line-height: 1.02;
+}
+
+.dc-stamp-line {
+  white-space: nowrap;
+  letter-spacing: 0.04em;
+}
+
+/* 票券 */
+.dc-perf {
+  border-left: 0.4mm dashed rgb(80 70 50 / 0.6);
+}
+
+.dc-tk-org,
+.dc-tk-title,
+.dc-tk-route,
+.dc-tk-stub-title {
+  font-family: var(--f-title);
+  text-align: center;
+  white-space: nowrap;
+  letter-spacing: 0.1em;
+}
+
+.dc-tk-title {
+  font-family: var(--f-masthead);
+  letter-spacing: 0.4em;
+}
+
+.dc-tk-route {
+  display: flex;
+  justify-content: center;
+  align-items: baseline;
+  gap: 0.6em;
+  font-family: var(--f-hand);
+  color: #1d2340;
+}
+
+.dc-tk-arrow {
+  font-family: var(--f-title);
+  color: #221a12;
+  font-size: 0.5em;
+}
+
+.dc-tk-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 4mm;
+  align-content: start;
+}
+
+.dc-tk-grid .dc-value {
+  font-family: var(--f-hand);
+  color: #1d2340;
+}
+
+.dc-tk-rule,
+.dc-tk-stub-line {
+  font-family: var(--f-body);
+  line-height: 1.4;
+  opacity: 0.85;
+}
+
+/* 當票、地契 */
+.dc-pawn-org {
+  font-family: var(--f-masthead);
+  text-align: center;
+  letter-spacing: 0.3em;
+  white-space: nowrap;
+}
+
+.dc-pawn-org.rtl {
+  direction: rtl;
+}
+
+.dc-pawn-big {
+  font-family: var(--f-hand);
+  text-align: center;
+  line-height: 1.2;
+  opacity: 0.9;
+}
+
+.dc-deed-title {
+  font-family: var(--f-masthead);
+  letter-spacing: 0.4em;
+}
+
+/* 表格 */
+.dc-form-org,
+.dc-form-title {
+  font-family: var(--f-title);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.dc-form-title {
+  font-family: var(--f-masthead);
+}
+
+.dc-form-no {
+  text-align: right;
+}
+
+.dc-form-table {
+  border-top: 0.4mm solid currentColor;
+}
+
+.dc-form-row {
+  display: grid;
+  grid-template-columns: 20mm 1fr 20mm 1fr;
+  border-bottom: 0.25mm solid currentColor;
+}
+
+.dc-form-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-right: 0.2mm solid currentColor;
+  font-family: var(--f-title);
+}
+
+.dc-form-value {
+  display: flex;
+  align-items: center;
+  padding: 0 2mm;
+  border-right: 0.2mm solid currentColor;
+  font-size: 1.15em;
+}
+
+.dc-form-head {
+  font-family: var(--f-title);
+  border-bottom: 0.3mm solid currentColor;
+}
+
+.dc-form-notes {
+  background-image: repeating-linear-gradient(to bottom, transparent 0 8.7mm, rgb(60 50 40 / 0.35) 8.7mm 9mm);
+  overflow: hidden;
+}
+
+.dc-form-sign {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--f-title);
+  border-top: 0.25mm solid currentColor;
+  padding-top: 1mm;
+}
+
+.dc-diagram-box {
+  border: 0.25mm solid currentColor;
+}
+
+.dc-diagram {
+  width: 100%;
+  height: 92%;
+}
+
+.dc-diagram-cap {
+  text-align: center;
+  font-family: var(--f-title);
+  font-size: 3mm;
+}
+
+/* 信封 */
+.dc-env-frame {
+  border: 0.7mm solid rgb(176 40 30 / 0.85);
+  box-shadow: inset 0 0 0 1mm var(--paper-base), inset 0 0 0 1.3mm rgb(176 40 30 / 0.6);
+}
+
+.dc-env-name {
+  text-align: center;
+  letter-spacing: 0.15em;
+}
+
+.dc-postage {
+  color: rgb(160 50 40);
+}
+
+.dc-postage-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.rl-text {
+  position: absolute;
+  inset: 0;
+}
+
+.rl-text > div,
+.rl > .rl-headnote,
+.rl > .rl-seal,
+.rl > .rl-vt,
+.rl-hole {
+  position: absolute;
+}
+
+.rl-ch {
+  text-align: center;
+  white-space: nowrap;
+}
+
+.nf-mh-ear-body {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  padding-top: 0.5mm;
+  writing-mode: vertical-rl;
+  line-height: 1.35;
+  letter-spacing: 0.04em;
+.rl-vt {
+  writing-mode: vertical-rl;
+  text-orientation: upright;
+  text-align: center;
+  white-space: nowrap;
+  line-height: 1.05;
+}
+
+/* 古籍：明體刻本；木刻質感用印泥濾鏡讓字邊毛、墨色不均 */
+.rl-book {
+  color: #241b12;
+}
+
+.rl-book .rl-ch {
+  font-family: var(--f-body);
+}
+
+.rl-woodblock {
+  filter: url('#f-ink');
+}
+
+.rl-heart .rl-vt {
+  font-family: var(--f-title);
+}
+
+/* 朱筆句讀：字的右下角一點；朱筆圈：字右側一個小圈 */
+.rl-ch.rl-stop::after {
+  content: '';
+  position: absolute;
+  right: 4%;
+  bottom: 6%;
+  width: 0.9mm;
+  height: 0.9mm;
+  border-radius: 50%;
+  background: rgb(192 38 26 / 0.88);
+}
+
+.rl-ch.rl-circ::before {
+  content: '';
+  position: absolute;
+  top: 34%;
+  right: -2%;
+  width: 1.3mm;
+  height: 1.3mm;
+  border: 0.28mm solid rgb(192 38 26 / 0.85);
+  border-radius: 50%;
+}
+
+.rl-headnote {
+  writing-mode: vertical-rl;
+  font-family: var(--f-hand);
+  color: rgb(186 34 24 / 0.95);
+  line-height: 1.25;
+  white-space: normal;
+}
+
+.rl-hole {
+  width: 1.8mm;
+  height: 1.8mm;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 0 0.25mm rgb(120 90 50 / 0.45);
+}
+
+/* 碑文拓片：墨拓上的字是紙色 */
+.rl-rubbing .rl-stone {
+  color: #e9e0cb;
+  font-family: var(--f-title);
+  -webkit-text-stroke: 0.25mm #e9e0cb;
+  filter: url('#f-ink');
+}
+
+.rl-stone-line {
+  stroke: rgb(225 215 195 / 0.75);
+}
+
+.rl-stone-title {
+  font-family: var(--f-masthead);
+}
+
+/* 印章 */
+.rl-seal {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  font-family: var(--f-masthead);
+  filter: url('#f-ink');
+}
+
+.rl-seal-text {
+  writing-mode: vertical-rl;
+  text-orientation: upright;
+  line-height: 1.02;
+  letter-spacing: 0;
+}
+
+.rl-seal-white {
+  background: rgb(176 30 24 / 0.9);
+  color: #f1e6d6;
+  border-radius: 0.6mm;
+}
+
+.rl-seal-red {
+  border: 0.5mm solid rgb(180 32 24 / 0.9);
+  color: rgb(180 32 24 / 0.92);
+}
+
+/* 符籙：朱砂 */
+.rl-tal-text {
+  font-family: var(--f-hand);
+  color: rgb(192 38 26 / 0.97);
+  -webkit-text-stroke: 0.35mm rgb(192 38 26 / 0.9);
+}
+
+.rl-tal-side {
+  font-family: var(--f-hand);
+  color: rgb(192 38 26 / 0.85);
+}
+}
+
+.dc-postage-name {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 2.8mm;
+  text-align: center;
+  font-family: var(--f-title);
+  font-size: 2.6mm;
+  white-space: nowrap;
+}
+
+.dc-postmark {
+  border: 0.5mm solid rgb(40 40 60 / 0.75);
+  border-radius: 50%;
+  color: rgb(40 40 60 / 0.8);
+  font-family: var(--f-title);
+  text-align: center;
+  filter: url('#f-ink');
+}
+
+.dc-pm-top {
+  margin-top: 4mm;
+  font-size: 4.2mm;
+  letter-spacing: 0.3em;
+}
+
+.dc-pm-date {
+  margin-top: 1mm;
+  font-size: 2.6mm;
+  white-space: nowrap;
+}
+
+.dc-cancel {
+  position: absolute;
+  color: rgb(40 40 60 / 0.6);
+  overflow: visible;
+/* ---------- 線索包：編號與主持人對照表（第五版） ---------- */
+
+.pack-label {
+  position: absolute;
+  right: 3mm;
+  bottom: 2mm;
+  z-index: 20;
+  padding: 0.3mm 1.5mm;
+  border: 0.25mm solid rgb(60 60 60 / 0.5);
+  border-radius: 1mm;
+  background: rgb(255 255 255 / 0.75);
+  color: rgb(40 40 40 / 0.85);
+  font-family: var(--f-title, serif);
+  font-size: 3.2mm;
+  line-height: 1.3;
+}
+
+.gm-sheet {
+  padding: 16mm 14mm;
+  box-sizing: border-box;
+  font-family: var(--f-body, serif);
+}
+
+.gm-title {
+  font-size: 7mm;
+  text-align: center;
+  letter-spacing: 0.3em;
+}
+
+.gm-note {
+  margin-bottom: 4mm;
+  text-align: center;
+  font-size: 3.4mm;
+  color: rgb(150 30 25);
+}
+
+.gm-head,
+.gm-row {
+  display: grid;
+  grid-template-columns: 22mm 52mm 1fr 60mm;
+  column-gap: 3mm;
+  align-items: center;
+}
+
+.gm-head {
+  padding: 1.5mm 0;
+  border-top: 0.4mm solid #222;
+  border-bottom: 0.25mm solid #222;
+  font-size: 3.4mm;
+}
+
+.gm-row {
+  height: 61mm;
+  border-bottom: 0.25mm solid #888;
+}
+
+.gm-no {
+  font-size: 5.5mm;
+  text-align: center;
+}
+
+.gm-thumb {
+  position: relative;
+  width: 50mm;
+  height: 58mm;
+  overflow: hidden;
+}
+
+.gm-thumb > .gm-clone {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  box-shadow: 0 0 0 0.6mm rgb(0 0 0 / 0.15);
+}
+
+.gm-kind {
+  font-size: 4.2mm;
+}
+
+.gm-summary {
+  margin-top: 1mm;
+  font-size: 3.4mm;
+  color: #555;
+}
+
+.gm-scene {
+  font-size: 3.8mm;
+  line-height: 1.5;
+}
+
+@media print {
+  .pack-scaler {
+    break-after: page;
+  }
+
+  .pack-scaler:last-child {
+    break-after: auto;
+  }
+}

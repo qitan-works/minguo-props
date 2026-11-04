@@ -4,10 +4,15 @@
 // 取捨：大部分效果是向量（SVG 線條、漸層），PDF 小、列印不卡。只有浸水與抹糊的墨跡用了
 // 模糊（字的複製品加 CSS filter，只顯示在那一塊範圍內），列印時瀏覽器會把那一塊轉成點陣圖。
 
-import { planEffects, waterBleed, type CharMarks, type EffectPlan, type Rgb } from '../lib/effects.ts';
-import { PX_PER_MM, polygonToPath, type Point, type Polygon, type Rect } from '../lib/geometry.ts';
+import { planEffects, waterBleed, type CharMarks, type EffectPlan } from '../lib/effects.ts';
+import type { FxItem } from '../lib/fx/catalog.ts';
+import { charColor, planFxItems, type FxPlan } from '../lib/fx/plan.ts';
+import { PX_PER_MM, inflateRect, polygonToPath, type Point, type Polygon, type Rect } from '../lib/geometry.ts';
 import type { ConditionData } from '../props/conditions.ts';
 import { h, s } from '../ui/dom.ts';
+import { bleedLayer, inkTintFilter } from './bleed.ts';
+import { applyPaperClip, drawFxItems } from './fx-items.ts';
+import { roughEdgePoints } from './sheet.ts';
 
 export interface PaperSpec {
   readonly width: number;
@@ -50,10 +55,6 @@ function path(poly: readonly Point[]): string {
   return polygonToPath(poly, 1);
 }
 
-function pxPath(polys: readonly (readonly Point[])[]): string {
-  return polys.map((p) => polygonToPath(p, PX_PER_MM)).join('');
-}
-
 function isFullRect(poly: readonly Point[], w: number, h: number): boolean {
   return (
     poly.length === 4 &&
@@ -63,21 +64,6 @@ function isFullRect(poly: readonly Point[], w: number, h: number): boolean {
 
 function strokePath(d: string, color: string, width: number, extra: Record<string, string | number> = {}): SVGPathElement {
   return s('path', { attrs: { d, fill: 'none', stroke: color, 'stroke-width': width, 'stroke-linejoin': 'round', ...extra } });
-}
-
-/** 焦痕：由外往內一圈圈疊上淡黃、褐、深褐、焦黑，再加灰燼碎片與焦裂。 */
-function charColor(i: number, count: number): string {
-  // t：0 為最深（離紙邊最遠，淡黃）、1 為紙邊（焦黑）；顏色依淡黃 → 褐 → 焦黑內插，越近紙邊越不透明
-  const t = count <= 1 ? 1 : i / (count - 1);
-  const stops: [number, number, number][] = [[214, 176, 92], [150, 92, 36], [58, 30, 12], [12, 7, 4]];
-  const x = t * (stops.length - 1);
-  const k = Math.min(stops.length - 2, Math.floor(x));
-  const f = x - k;
-  const a = stops[k] as [number, number, number];
-  const b = stops[k + 1] as [number, number, number];
-  const mix = (j: 0 | 1 | 2): number => Math.round(a[j] + (b[j] - a[j]) * f);
-  const alpha = 0.07 + 0.55 * Math.pow(t, 1.8) + (t > 0.95 ? 0.35 : 0);
-  return `rgb(${mix(0)} ${mix(1)} ${mix(2)} / ${Math.min(0.97, alpha).toFixed(2)})`;
 }
 
 function drawChar(svg: SVGSVGElement, marks: CharMarks | null): void {
@@ -92,50 +78,15 @@ function drawChar(svg: SVGSVGElement, marks: CharMarks | null): void {
   }
 }
 
-/**
- * 把墨色換成指定顏色的濾鏡（給暈開的字用）：顏色一律換成 rgb，透明度照原本的，越淺的顏色（例如紅色格線）越淡。
- * CSS 的 sepia()、brightness() 改不動接近黑色的墨，所以用 SVG 的 feColorMatrix。
- */
-function inkTintFilter(id: string, [r, g, b]: Rgb): SVGFilterElement {
-  const c = (v: number): string => (v / 255).toFixed(3);
-  return s(
-    'filter',
-    { attrs: { id, 'color-interpolation-filters': 'sRGB' } },
-    s('feColorMatrix', { attrs: { type: 'matrix', values: `0 0 0 0 ${c(r)}  0 0 0 0 ${c(g)}  0 0 0 0 ${c(b)}  -0.25 -0.45 -0.08 1 0` } }),
-  );
-}
-
-interface BleedStyle {
-  /** 換墨色的 SVG 濾鏡 id（見 inkTintFilter）。 */
-  readonly tint?: string;
-  /** 模糊（CSS 像素）。 */
-  readonly blur: number;
-  readonly opacity: number;
-  /** 先蓋一層紙色把底下清楚的字洗掉（0～1）。 */
-  readonly wash?: number;
-}
-
-/**
- * 字的複製品（拿掉標記與編號），模糊並染色後只顯示在指定範圍內。
- * 換色的濾鏡放在字上，模糊與透明度放在外層；都是一般的 CSS filter，預覽與列印的 PDF 相同。
- */
-function bleedLayer(content: HTMLElement, polygons: readonly (readonly Point[])[], evenodd: boolean, style: BleedStyle): HTMLElement {
-  const clone = content.cloneNode(true) as HTMLElement;
-  for (const el of clone.querySelectorAll('[data-mark]')) el.removeAttribute('data-mark');
-  for (const el of clone.querySelectorAll('[data-block-id]')) el.removeAttribute('data-block-id');
-  for (const el of clone.querySelectorAll('[id]')) el.removeAttribute('id');
-  clone.removeAttribute('id');
-  clone.classList.add('fx-bleed-text');
-  clone.setAttribute('aria-hidden', 'true');
-  if (style.tint) clone.style.setProperty('filter', `url(#${style.tint})`);
-  const blurred = h('div', { class: 'fx-bleed-blur', style: { filter: `blur(${style.blur.toFixed(2)}px)`, opacity: style.opacity.toFixed(2) } }, clone);
-  const wash = style.wash ?? 0;
-  const paperWash = wash > 0 ? [h('div', { class: 'fx-bleed-wash', style: { background: `rgb(250 244 228 / ${wash.toFixed(2)})` } })] : [];
-  return h('div', { class: 'fx-bleed', style: { 'clip-path': `path(${evenodd ? 'evenodd, ' : ''}'${pxPath(polygons)}')` } }, ...paperWash, blurred);
-}
-
 /** 把一份規劃畫到紙上。 */
-function draw(paper: HTMLElement, content: HTMLElement | null, plan: EffectPlan, c: ConditionData): void {
+interface FxInput {
+  readonly plans: readonly FxPlan[];
+  readonly protect: readonly Rect[];
+  readonly selectedId: string | null;
+  readonly spec: PaperSpec;
+}
+
+function draw(paper: HTMLElement, content: HTMLElement | null, plan: EffectPlan, c: ConditionData, fx: FxInput): void {
   const w = plan.width;
   const ph = plan.height;
   const id = `fx${++uid}`;
@@ -337,10 +288,16 @@ function draw(paper: HTMLElement, content: HTMLElement | null, plan: EffectPlan,
   }
   paper.appendChild(layer);
 
-  // 紙張外形與破洞
-  const clipped = !isFullRect(plan.outline, w, ph) || plan.holes.length > 0;
+  // 逐一放置的效果（第五版）：畫在紙張狀況之上、裝飾之下
+  const fxCuts = drawFxItems({ paper, content, width: w, height: ph, plans: fx.plans, protect: fx.protect, selectedId: fx.selectedId });
+
+  // 紙張外形與破洞（原本有剪刀毛邊的紙，加了挖洞的項目時毛邊照樣保留）
+  const full = isFullRect(plan.outline, w, ph);
+  const clipped = !full || plan.holes.length > 0 || fxCuts.length > 0;
   if (clipped) {
-    paper.style.setProperty('clip-path', `path(evenodd, '${pxPath([plan.outline, ...plan.holes.map((x) => x.polygon)])}')`);
+    const rough = full && paper.classList.contains('rough-edge');
+    const outline = rough ? roughEdgePoints(fx.spec.width, fx.spec.height, c.effectSeed * 104729 + fx.spec.variant, paper.offsetWidth / PX_PER_MM, paper.offsetHeight / PX_PER_MM) : plan.outline;
+    applyPaperClip(paper, [outline, ...plan.holes.map((x) => x.polygon)], fxCuts, w, ph);
   }
   // 墨水漸淡（直排由右往左讀，越往左越淡）
   if (content) {
@@ -367,7 +324,7 @@ function draw(paper: HTMLElement, content: HTMLElement | null, plan: EffectPlan,
           height: `${ph}mm`,
         },
       },
-      ...[plan.outline, ...plan.holes.filter((x) => x.kind === 'burn').map((x) => x.polygon)].map((poly) =>
+      ...[plan.outline, ...plan.holes.filter((x) => x.kind === 'burn').map((x) => x.polygon), ...fxCuts].map((poly) =>
         strokePath(path(poly), 'rgb(120 120 120 / 0.55)', 0.25, { 'stroke-dasharray': '1.5 1' }),
       ),
     );
@@ -376,21 +333,28 @@ function draw(paper: HTMLElement, content: HTMLElement | null, plan: EffectPlan,
 }
 
 /** 對 root 底下所有已登記的紙面畫上紙張狀況。需在內容排好、掛進文件之後呼叫。 */
-export function applyPaperEffects(root: ParentNode): void {
+/**
+ * 對 root 底下所有已登記的紙面畫上紙張狀況與逐一放置的效果（items）。需在內容排好、掛進文件之後呼叫。
+ * 同一頁有多張紙（名片拼版）時，每張都畫上同樣的項目。
+ */
+export function applyPaperEffects(root: ParentNode, items: readonly FxItem[] = [], selectedId: string | null = null): void {
   for (const paper of root.querySelectorAll<HTMLElement>('.paper')) {
     const spec = registry.get(paper);
     if (!spec) continue;
-    paper.querySelector('.fx-layer')?.remove();
-    paper.parentElement?.querySelectorAll(':scope > .fx-guide').forEach((g) => g.remove());
+    paper.querySelectorAll(':scope > .fx-layer').forEach((l) => l.remove());
+    paper.parentElement?.querySelectorAll(':scope > .fx-guide, :scope > .fx-clipdefs, :scope > .fx-hit-layer').forEach((g) => g.remove());
+    const protect = measureMarks(paper, 'protect');
+    const plans = planFxItems(items, { protect: protect.map((r) => inflateRect(r, 1.2)) });
     const plan = planEffects({
       width: spec.width,
       height: spec.height,
       settings: spec.conditions,
-      protect: measureMarks(paper, 'protect'),
+      protect,
       destroy: measureMarks(paper, 'destroy'),
       crop: spec.crop,
       variant: spec.variant,
+      burnItems: plans.some((p) => p.kind === 'burn' && p.cuts.length > 0),
     });
-    draw(paper, paper.querySelector<HTMLElement>('.paper-content'), plan, spec.conditions);
+    draw(paper, paper.querySelector<HTMLElement>('.paper-content'), plan, spec.conditions, { plans, protect, selectedId, spec });
   }
 }

@@ -4,7 +4,7 @@
 // 全部用 CSS、SVG 與 canvas 即時產生，不使用任何圖片素材。
 
 import { fontStack, fontVertical } from '../fonts.ts';
-import type { Polygon } from '../lib/geometry.ts';
+import type { Point, Polygon } from '../lib/geometry.ts';
 import { mulberry32 } from '../lib/random.ts';
 import { PAPER_SIZES, type FontChoice, type PaperKey } from '../props/common.ts';
 import type { ConditionData } from '../props/conditions.ts';
@@ -184,4 +184,21 @@ export function findOverflow(root: ParentNode): boolean {
     if (el.scrollWidth > el.clientWidth + 2 || el.scrollHeight > el.clientHeight + 2) return true;
   }
   return false;
+}
+
+/**
+ * 與 roughEdgePolygon 相同的剪刀毛邊，換算成紙面公釐的多邊形（同一個種子、同樣的抖動順序）。
+ * width、height 是原本的紙面大小（決定取幾個點），actualW、actualH 是排版後實際的大小。
+ */
+export function roughEdgePoints(width: number, height: number, seed: number, actualW = width, actualH = height): Point[] {
+  const rand = seededRandom(seed);
+  const jitter = (): number => Number((rand() * 0.9).toFixed(2));
+  const nx = Math.max(8, Math.round(width / 3));
+  const ny = Math.max(8, Math.round(height / 3));
+  const pts: Point[] = [];
+  for (let i = 0; i < nx; i++) pts.push({ x: (actualW * i) / nx, y: jitter() });
+  for (let i = 0; i < ny; i++) pts.push({ x: actualW - jitter(), y: (actualH * i) / ny });
+  for (let i = nx; i > 0; i--) pts.push({ x: (actualW * i) / nx, y: actualH - jitter() });
+  for (let i = ny; i > 0; i--) pts.push({ x: jitter(), y: (actualH * i) / ny });
+  return pts;
 }

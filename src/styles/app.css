@@ -667,3 +667,74 @@ textarea:focus-visible {
 .btn-danger {
   color: var(--ui-error);
 }
+
+/* ---------- 第五版：特效項目編輯器 ---------- */
+
+.fx-editor .deco-add {
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.fx-editor .deco-add input[type='number'] {
+  width: 4.5em;
+}
+
+.fx-panel {
+  display: grid;
+  gap: 4px;
+  margin: 8px 0;
+  padding: 8px;
+  border: 1px solid rgb(31 90 160 / 0.45);
+  border-radius: 4px;
+  background: rgb(31 90 160 / 0.05);
+}
+
+.fx-panel-title {
+  margin: 0 0 4px;
+  font-size: 0.95rem;
+}
+
+.fx-panel .deco-slider {
+  grid-template-columns: 7.5em 1fr 4.5em;
+}
+
+.fx-tone-ends {
+  display: flex;
+  justify-content: space-between;
+  margin: -2px 4.5em 2px 7.5em;
+  color: var(--ui-muted, #666);
+  font-size: 0.75rem;
+}
+
+.fx-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.fx-list {
+  display: grid;
+  gap: 2px;
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+  max-height: 16em;
+  overflow-y: auto;
+}
+
+.fx-row {
+  display: flex;
+  gap: 4px;
+}
+
+.fx-row > .btn:first-child {
+  flex: 1;
+  text-align: left;
+}
+
+.fx-row-selected > .btn:first-child {
+  border-color: rgb(31 90 160 / 0.7);
+  background: rgb(31 90 160 / 0.1);
+}
+.fx-note { color: #8a4b00; }

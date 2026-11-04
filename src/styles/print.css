@@ -108,6 +108,7 @@ html[data-page='card-portrait'] body {
   .popover,
   .crop-overlay,
   .crop-hint,
+  .fx-hit-layer,
   .noscript {
     display: none !important;
   }

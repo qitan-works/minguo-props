@@ -5,7 +5,7 @@ import { formatMinguoDate, parseIsoDate } from '../lib/minguo.ts';
 import type { Polygon } from '../lib/geometry.ts';
 import { fontsOf } from '../props/common.ts';
 import { pickConditions } from '../props/conditions.ts';
-import { parseDocLines, type DocumentData } from '../props/document.ts';
+import { autopsyMarks, parseDocLines, type DocumentData } from '../props/document.ts';
 import { h, s } from '../ui/dom.ts';
 import { createPaperSurface, createSheet } from './sheet.ts';
 
@@ -179,7 +179,7 @@ function renderForm(data: DocumentData, crop: Polygon | null): HTMLElement {
   const diagramW = autopsy ? 46 : 0;
   content.append(box('dc-form-head', x0, top, w, 7, { 'font-size': mm(4) }, autopsy ? '檢驗結果' : '病情記錄'));
   content.append(box('dc-form-notes dc-hand', x0, top + 8, w - diagramW - (autopsy ? 4 : 0), H - top - 60, { 'font-size': mm(5), 'line-height': mm(9) }, data.docBody));
-  if (autopsy) content.appendChild(bodyDiagram(x0 + w - diagramW, top + 8, diagramW, Math.min(110, H - top - 60)));
+  if (autopsy) content.appendChild(bodyDiagram(x0 + w - diagramW, top + 8, diagramW, Math.min(110, H - top - 60), autopsyMarks(data.markSpot, Number(data.markCount))));
   const date = dateText(data);
   content.append(box('dc-form-sign', x0, H - 46, w, 8, { 'font-size': mm(4) }, h('span', { text: date ? `中華民國${date.replace(/^民國/, '')}` : '' }), h('span', { text: autopsy ? '檢驗員簽章' : '主治醫師簽章' })));
   const st = stamp(data.docStamp, W - 62, H - 60, 28, true, -8);
@@ -189,13 +189,13 @@ function renderForm(data: DocumentData, crop: Polygon | null): HTMLElement {
 }
 
 /** 驗屍報告的人形圖（正面），左胸畫上三個圓形印痕。 */
-function bodyDiagram(x: number, y: number, w: number, hh: number): HTMLElement {
+function bodyDiagram(x: number, y: number, w: number, hh: number, marks: readonly { readonly cx: number; readonly cy: number }[]): HTMLElement {
   const svg = s('svg', { class: 'dc-diagram', attrs: { viewBox: '0 0 40 100', preserveAspectRatio: 'xMidYMid meet' } });
   const p = (d: string, extra: Record<string, string | number> = {}): SVGElement => s('path', { attrs: { d, fill: 'none', stroke: 'currentColor', 'stroke-width': 0.6, 'stroke-linejoin': 'round', ...extra } });
   svg.append(
     s('circle', { attrs: { cx: 20, cy: 8, r: 6, fill: 'none', stroke: 'currentColor', 'stroke-width': 0.6 } }),
     p('M14 16 Q20 18 26 16 L33 22 L36 46 L32 47 L29 27 L28 50 L30 96 L23 96 L20 58 L17 96 L10 96 L12 50 L11 27 L8 47 L4 46 L7 22 Z'),
-    ...[0, 1, 2].map((i) => s('circle', { attrs: { cx: 23.5 + i * 1.6, cy: 27 + i * 2.4 - (i === 1 ? 0.8 : 0), r: 1.1, fill: 'none', stroke: 'rgb(170 30 25)', 'stroke-width': 0.5 } })),
+    ...marks.map((m) => s('circle', { attrs: { cx: m.cx.toFixed(2), cy: m.cy.toFixed(2), r: 1.1, fill: 'none', stroke: 'rgb(170 30 25)', 'stroke-width': 0.5 } })),
   );
   return box('dc-diagram-box', x, y, w, hh, {}, svg, h('div', { class: 'dc-diagram-cap', text: '正面' }));
 }

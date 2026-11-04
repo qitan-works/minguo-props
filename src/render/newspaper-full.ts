@@ -25,7 +25,7 @@ import { PAPER_SIZES, fontsOf, isPaperKey, type PaperKey } from '../props/common
 import { pickConditions } from '../props/conditions.ts';
 import { headlineMix } from '../props/eras.ts';
 import type { NewspaperExtras } from '../props/extras.ts';
-import type { NewspaperData } from '../props/newspaper.ts';
+import { earParts, type NewspaperData } from '../props/newspaper.ts';
 import { h, s } from '../ui/dom.ts';
 import { setPaperCrop } from './effects.ts';
 import { outlineTextSvg, patternFrameSvg, pictureSvg } from './illustrations.ts';
@@ -551,10 +551,13 @@ function mastheadBox(data: NewspaperData, g: BroadsheetGeometry, r: Rect): HTMLE
     }
     if (ear) {
       const ears = [
-        { x: r.w - pad - ear - 0.6, head: '本報特別啟事', body: '本報增設本埠分館，代收廣告與訂閱。外埠函購，郵票十足通用。' },
-        { x: pad + 0.6, head: '廣告刊例', body: '封面每行每日大洋二角，長期另議；各欄刊例，函索即寄。' },
+        { x: r.w - pad - ear - 0.6, text: data.earRight },
+        { x: pad + 0.6, text: data.earLeft },
       ];
-      for (const e of ears) {
+      for (const one of ears) {
+        const parts = earParts(one.text);
+        if (!parts) continue;
+        const e = { x: one.x, ...parts };
         box.appendChild(
           h(
             'div',

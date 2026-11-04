@@ -46,6 +46,19 @@ export const REAL_NEWSPAPER_NAMES = [
 /** 虛構報頭建議（已用網路搜尋確認查無同名的民國報刊；無法保證完全沒有）。 */
 export const FICTIONAL_MASTHEADS = ['霧港日報', '海隅晚報', '江左異聞報', '滄瀛新報'] as const;
 
+/** 頂部橫排報頭左右報耳的預設文字（原創）。 */
+export const EAR_DEFAULTS = {
+  right: '本報特別啟事\n本報增設本埠分館，代收廣告與訂閱。外埠函購，郵票十足通用。',
+  left: '廣告刊例\n封面每行每日大洋二角，長期另議；各欄刊例，函索即寄。',
+} as const;
+
+/** 報耳的文字：第一行是標題，第二行起是內文；全空時回傳 null（不印那一邊）。 */
+export function earParts(text: string): { readonly head: string; readonly body: string } | null {
+  const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  if (lines.length === 0) return null;
+  return { head: lines[0] ?? '', body: lines.slice(1).join('') };
+}
+
 export const newspaperFields = [
   {
     key: 'era',
@@ -133,6 +146,8 @@ export const newspaperFields = [
 
   { key: 'masthead', type: 'text', label: '報頭', group: '報頭', maxLength: 8, hint: '預設為虛構報名，請勿使用真實報紙名稱。', showIf: { key: 'showMasthead', in: [true] } },
   { key: 'mastheadLayout', type: 'select', label: '報頭位置', group: '報頭', options: MASTHEAD_LAYOUTS, showIf: { key: 'showMasthead', in: [true] } },
+  { key: 'earRight', type: 'textarea', label: '右邊的報耳', group: '報頭', maxLength: 60, rows: 2, hint: '頂部橫排報頭左右的小框。第一行是標題，第二行起是內文；留空就不印這一邊。', showIf: { key: 'mastheadLayout', in: ['top'] } },
+  { key: 'earLeft', type: 'textarea', label: '左邊的報耳', group: '報頭', maxLength: 60, rows: 2, showIf: { key: 'mastheadLayout', in: ['top'] } },
   { key: 'englishName', type: 'text', label: '英文報名', group: '報頭', maxLength: 40, hint: '虛構，例如 THE MIST HARBOUR DAILY。', showIf: { key: 'showMasthead', in: [true] } },
   { key: 'showLunar', type: 'checkbox', label: '日期附舊曆', group: '報頭', hint: '依香港天文台的公曆農曆對照表換算（1912～1949 年）。' },
   { key: 'headerStrip', type: 'checkbox', label: '報眉（版面最上方的細欄）', group: '報頭', showIf: FULL },
@@ -200,6 +215,8 @@ export const newspaperDefaults: NewspaperData = {
   clipEdge: true,
   masthead: '霧港日報',
   mastheadLayout: ERA_DEFAULT?.mastheadLayout ?? 'right',
+  earRight: EAR_DEFAULTS.right,
+  earLeft: EAR_DEFAULTS.left,
   englishName: 'THE MIST HARBOUR DAILY',
   showLunar: true,
   headerStrip: true,

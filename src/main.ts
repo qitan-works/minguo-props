@@ -35,9 +35,14 @@ import {
   serializeState,
   updateExtras,
   updateProp,
+  sanitizePack,
   type AppState,
+  type PackEntry,
   type PropKind,
 } from './state.ts';
+import { buildPackEditor } from './ui/pack.ts';
+import { MAX_SHARE_CHARS, SHARE_PREFIX, clueLabel, compactAgainst, decodeShare, encodeShare, summaryOf } from './lib/pack.ts';
+import { PAPER_SIZES, isPaperKey } from './props/common.ts';
 import { h } from './ui/dom.ts';
 import { buildForm, type FieldValue } from './ui/form.ts';
 import { buildItemsEditor } from './ui/items.ts';
@@ -275,7 +280,166 @@ function rebuildForm(): void {
       }),
     );
   }
+  els.form.appendChild(packEditor(kind));
   els.form.setAttribute('aria-labelledby', `tab-${kind}`);
+}
+
+// ---- 線索包（第五版） ----
+
+/** 預覽整包（不存檔）。 */
+let packMode = false;
+let shareUrl: string | null = null;
+
+function setPack(pack: readonly PackEntry[]): void {
+  state = { ...state, pack };
+  shareUrl = null;
+  if (pack.length === 0) packMode = false;
+  scheduleSave();
+  rebuildForm();
+  queueRender();
+}
+
+function snapshot(kind: PropKind, id: string, scene: string): PackEntry {
+  return { id, kind, scene, props: structuredClone(state.props[kind]), extras: structuredClone(state.extras[kind]) };
+}
+
+function packEditor(kind: PropKind): HTMLElement {
+  return buildPackEditor({
+    entries: state.pack,
+    current: kind,
+    previewing: packMode,
+    shareUrl,
+    onAdd() {
+      setPack([...state.pack, snapshot(kind, newId('k'), '')]);
+      setStatus(`已把目前的${PROP_LABELS[kind]}加入線索包，編號為${clueLabel(state.pack.length - 1)}。`);
+    },
+    onChange: setPack,
+    onLoad(entry) {
+      packMode = false;
+      state = { ...state, active: entry.kind, props: { ...state.props, [entry.kind]: structuredClone(entry.props) }, extras: { ...state.extras, [entry.kind]: structuredClone(entry.extras) } };
+      scheduleSave();
+      renderTabs();
+      rebuildForm();
+      queueRender();
+      setStatus('已把這一件載回表單；改好後可以按「用目前的內容取代」存回線索包。');
+    },
+    onReplace(id) {
+      setPack(state.pack.map((e) => (e.id === id ? snapshot(kind, e.id, e.scene) : e)));
+      setStatus('已用目前的內容取代線索包裡的這一件。');
+    },
+    onPreview(on) {
+      packMode = on;
+      rebuildForm();
+      queueRender();
+    },
+    onShare() {
+      void (async () => {
+        const defaults = defaultState();
+        const compact = state.pack.map((e) => ({ ...e, props: compactAgainst(e.props as never, defaults.props[e.kind] as never), extras: compactAgainst(e.extras as never, defaults.extras[e.kind] as never) }));
+        const data = await encodeShare(compact);
+        const url = `${location.origin}${location.pathname}${SHARE_PREFIX}${data}`;
+        if (data.length > MAX_SHARE_CHARS) {
+          shareUrl = null;
+          rebuildForm();
+          setStatus(`線索包太大（網址約 ${data.length} 字元，照片會讓它變得很長），聊天軟體或瀏覽器可能截斷網址。請改用「匯出 JSON」傳給對方。`, 'warn');
+          return;
+        }
+        shareUrl = url;
+        rebuildForm();
+        try {
+          await navigator.clipboard.writeText(url);
+          setStatus('已產生分享網址並複製到剪貼簿。');
+        } catch {
+          setStatus('已產生分享網址（在線索包面板裡，點一下全選後複製）。');
+        }
+      })();
+    },
+  });
+}
+
+/** 依道具種類畫出一件（線索包用；整版報紙不標選取的區塊）。 */
+function entrySheet(e: PackEntry): HTMLElement {
+  const props = e.props as never;
+  const extras = e.extras as never;
+  switch (e.kind) {
+    case 'newspaper': {
+      const np = e.props as AppState['props']['newspaper'];
+      return np.fit === 'full' || np.fit === 'cut' ? renderNewspaperFull(np, extras, null).sheet : renderNewspaper(np, (extras as { crop: null }).crop);
+    }
+    case 'telegram':
+      return renderTelegram(props, codebook, (extras as { crop: null }).crop).sheet;
+    case 'letter':
+      return renderLetter(props, (extras as { crop: null }).crop);
+    case 'card':
+      return renderCard(props, (extras as { crop: null }).crop);
+    case 'relic':
+      return renderRelic(props, (extras as { crop: null }).crop);
+    case 'document':
+      return renderDocument(props, (extras as { crop: null }).crop);
+  }
+}
+
+/** 主持人對照表：每頁四件，縮圖、編號、道具與摘要、要在哪一幕給。 */
+function gmSheets(entries: readonly PackEntry[], sheets: readonly HTMLElement[]): HTMLElement[] {
+  const pages: HTMLElement[] = [];
+  for (let p = 0; p * 4 < entries.length; p++) {
+    const sheet = h('div', { class: 'sheet gm-sheet', dataset: { page: 'a4-portrait' }, style: { '--sheet-w': '210mm', '--sheet-h': '297mm' } });
+    const rows = entries.slice(p * 4, p * 4 + 4).map((e, k) => {
+      const i = p * 4 + k;
+      const src = sheets[i];
+      const thumb = h('div', { class: 'gm-thumb' });
+      if (src) {
+        const key = src.dataset['page'];
+        const size = key && isPaperKey(key) ? PAPER_SIZES[key] : { width: 210, height: 297 };
+        const scale = Math.min(48 / size.width, 58 / size.height);
+        const clone = src.cloneNode(true) as HTMLElement;
+        clone.classList.add('gm-clone');
+        clone.style.setProperty('transform', `scale(${scale.toFixed(4)})`);
+        thumb.appendChild(clone);
+      }
+      return h(
+        'div',
+        { class: 'gm-row' },
+        h('div', { class: 'gm-no', text: clueLabel(i) }),
+        thumb,
+        h('div', { class: 'gm-info' }, h('div', { class: 'gm-kind', text: PROP_LABELS[e.kind] }), h('div', { class: 'gm-summary', text: summaryOf(e.props as never) })),
+        h('div', { class: 'gm-scene', text: e.scene || '（未填）' }),
+      );
+    });
+    sheet.append(
+      h('div', { class: 'gm-title', text: `主持人對照表${entries.length > 4 ? `（${p + 1}）` : ''}` }),
+      h('div', { class: 'gm-note', text: '這一頁不要發給玩家。' }),
+      h('div', { class: 'gm-head' }, h('div', { text: '編號' }), h('div', { text: '縮圖' }), h('div', { text: '道具' }), h('div', { text: '在哪一幕給' })),
+      ...rows,
+    );
+    pages.push(sheet);
+  }
+  return pages;
+}
+
+function renderPackPreview(): void {
+  const sheets: HTMLElement[] = [];
+  const scalers: HTMLElement[] = [];
+  state.pack.forEach((e, i) => {
+    const sheet = entrySheet(e);
+    sheet.appendChild(h('div', { class: 'pack-label', text: clueLabel(i) }));
+    sheets.push(sheet);
+    scalers.push(h('div', { class: 'sheet-scaler pack-scaler' }, sheet));
+  });
+  els.stage.replaceChildren(...scalers);
+  state.pack.forEach((e, i) => {
+    const sheet = sheets[i] as HTMLElement;
+    fitNewspaperToContent(sheet);
+    applyPaperEffects(sheet);
+    drawDecorations(sheet, e.extras.decorations, null);
+  });
+  // 對照表的縮圖要在每一件畫好紙張狀況之後再複製
+  for (const gm of gmSheets(state.pack, sheets)) els.stage.appendChild(h('div', { class: 'sheet-scaler pack-scaler' }, gm));
+  els.stage.classList.add('pack-stage');
+  document.documentElement.dataset['page'] = sheets[0]?.dataset['page'] ?? 'a4-portrait';
+  fitPreview();
+  els.overflow.hidden = true;
+  renderTelegramInfo(null);
 }
 
 // ---- 自由裁切 ----
@@ -451,6 +615,11 @@ function renderTelegramInfo(result: TelegramRender | null): void {
 function renderPreview(): void {
   closePopover();
   lastFull = null;
+  els.stage.classList.remove('pack-stage');
+  if (packMode && state.pack.length) {
+    renderPackPreview();
+    return;
+  }
   let sheet: HTMLElement;
   let telegram: TelegramRender | null = null;
   switch (state.active) {
@@ -522,15 +691,20 @@ function previewSpace(): Size {
 }
 
 function fitPreview(): void {
-  const scaler = els.stage.querySelector<HTMLElement>('.sheet-scaler');
-  const sheet = scaler?.querySelector<HTMLElement>('.sheet');
-  if (!scaler || !sheet) return;
-  const natural = { w: sheet.offsetWidth, h: sheet.offsetHeight };
-  if (natural.w === 0) return;
-  currentScale = previewScale(previewZoom, natural, previewSpace());
-  scaler.style.setProperty('--scale', String(currentScale));
-  scaler.style.setProperty('width', `${natural.w * currentScale}px`);
-  scaler.style.setProperty('height', `${natural.h * currentScale}px`);
+  const scalers = [...els.stage.querySelectorAll<HTMLElement>(':scope > .sheet-scaler')];
+  if (scalers.length === 0) return;
+  // 線索包：每一張各自依大小縮放，縮放比例顯示第一張的
+  scalers.forEach((scaler, i) => {
+    const sheet = scaler.querySelector<HTMLElement>(':scope > .sheet');
+    if (!sheet) return;
+    const natural = { w: sheet.offsetWidth, h: sheet.offsetHeight };
+    if (natural.w === 0) return;
+    const scale = previewScale(previewZoom, natural, previewSpace());
+    if (i === 0) currentScale = scale;
+    scaler.style.setProperty('--scale', String(scale));
+    scaler.style.setProperty('width', `${natural.w * scale}px`);
+    scaler.style.setProperty('height', `${natural.h * scale}px`);
+  });
   els.zoomValue.textContent = `${Math.round(currentScale * 100)}%`;
   for (const b of els.previewBar.querySelectorAll<HTMLButtonElement>('[data-fit]')) {
     b.setAttribute('aria-pressed', String(b.dataset['fit'] === previewZoom.fit));
@@ -1015,5 +1189,24 @@ async function loadCodebook(): Promise<void> {
 renderTabs();
 rebuildForm();
 renderPreview();
+void loadSharedPack();
+
+/** 網址的 # 後面帶著線索包時，載入它並預覽整包。 */
+async function loadSharedPack(): Promise<void> {
+  if (!location.hash.startsWith(SHARE_PREFIX)) return;
+  try {
+    const warnings: string[] = [];
+    const pack = sanitizePack(await decodeShare(location.hash.slice(SHARE_PREFIX.length)), warnings);
+    if (pack.length === 0) throw new Error('empty');
+    state = { ...state, pack };
+    packMode = true;
+    scheduleSave();
+    rebuildForm();
+    queueRender();
+    setStatus(`已從網址載入線索包（${pack.length} 件）。${warnings.join('')}`, warnings.length ? 'warn' : 'info');
+  } catch {
+    setStatus('網址裡的線索包無法讀取（可能被截斷了）。', 'error');
+  }
+}
 void loadCodebook();
 void document.fonts.ready.then(() => queueRender());

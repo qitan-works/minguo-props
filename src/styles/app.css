@@ -763,4 +763,43 @@ textarea:focus-visible {
   color: #fff;
   font-size: 0.8rem;
   pointer-events: none;
+/* ---------- 第五版：線索包 ---------- */
+
+.pack-editor .pack-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 4px 0;
+}
+
+.pack-list {
+  display: grid;
+  gap: 6px;
+  margin: 6px 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pack-row {
+  display: grid;
+  gap: 3px;
+  padding: 6px 0;
+  border-top: 1px dashed var(--ui-line);
+}
+
+.pack-head {
+  display: flex;
+  gap: 0.6em;
+  font-size: 0.9rem;
+}
+
+.pack-url {
+  width: 100%;
+  font-size: 0.8rem;
+}
+
+.pack-stage {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
 }

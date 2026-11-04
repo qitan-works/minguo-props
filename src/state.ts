@@ -51,7 +51,20 @@ export interface AppState {
   readonly active: PropKind;
   readonly props: PropsState;
   readonly extras: ExtrasState;
+  /** 第五版：線索包（多張道具的快照，依序編號為線索一、二……）。 */
+  readonly pack: readonly PackEntry[];
 }
+
+/** 線索包裡的一件：某個道具在加入當時的內容（表單欄位與結構化資料），以及要在哪一幕給。 */
+export interface PackEntry {
+  readonly id: string;
+  readonly kind: PropKind;
+  readonly scene: string;
+  readonly props: PropsState[PropKind];
+  readonly extras: ExtrasState[PropKind];
+}
+
+export const PACK_LIMITS = { entries: 30, scene: 60 } as const;
 
 export const PROP_FIELDS: { readonly [K in PropKind]: readonly Field[] } = {
   newspaper: newspaperFields,
@@ -74,6 +87,7 @@ export function defaultState(): AppState {
       document: { ...documentDefaults },
     },
     extras: defaultExtras(),
+    pack: [],
   };
 }
 
@@ -88,6 +102,7 @@ export interface SaveFile {
   readonly active: PropKind;
   readonly props: PropsState;
   readonly extras: Record<keyof ExtrasState, unknown>;
+  readonly pack?: readonly PackEntry[];
 }
 
 export function toSaveFile(state: AppState, now: Date = new Date()): SaveFile {
@@ -98,6 +113,7 @@ export function toSaveFile(state: AppState, now: Date = new Date()): SaveFile {
     active: state.active,
     props: state.props,
     extras: compactExtras(state.extras),
+    ...(state.pack.length ? { pack: state.pack } : {}),
   };
 }
 
@@ -167,7 +183,8 @@ export function parseSaveObject(input: unknown): ParseResult {
   if (isPropKind(input['active'])) active = input['active'];
   else if (input['active'] !== undefined) warnings.push('無法辨識存檔中目前的道具種類，已切換到報紙剪報。');
 
-  return { ok: true, state: { active, props, extras: extrasResult.extras }, warnings };
+  const pack = sanitizePack(input['pack'], warnings);
+  return { ok: true, state: { active, props, extras: extrasResult.extras, pack }, warnings };
 }
 
 export function parseSaveText(text: string): ParseResult {
@@ -189,4 +206,34 @@ export function updateProp<K extends PropKind>(state: AppState, kind: K, patch: 
 /** 更新某個道具的結構化資料。 */
 export function updateExtras<K extends PropKind>(state: AppState, kind: K, patch: Partial<ExtrasState[K]>): AppState {
   return { ...state, extras: { ...state.extras, [kind]: { ...state.extras[kind], ...patch } } };
+}
+
+const PACK_ID_RE = /^[A-Za-z0-9_-]{1,40}$/;
+
+/**
+ * 匯入線索包：逐件驗證。道具種類不認得、格式不符的那一件丟棄；
+ * 每一件的表單欄位與結構化資料用和道具本身一樣的規則驗證（缺的欄位用預設值）。
+ */
+export function sanitizePack(raw: unknown, warnings: string[] = []): PackEntry[] {
+  if (raw === undefined || raw === null) return [];
+  if (!Array.isArray(raw)) {
+    warnings.push('線索包格式不符，已略過。');
+    return [];
+  }
+  const defaults = defaultState().props;
+  const out: PackEntry[] = [];
+  let dropped = Math.max(0, raw.length - PACK_LIMITS.entries);
+  for (const item of raw.slice(0, PACK_LIMITS.entries)) {
+    if (!isRecord(item) || !isPropKind(item['kind']) || typeof item['id'] !== 'string' || !PACK_ID_RE.test(item['id'])) {
+      dropped++;
+      continue;
+    }
+    const kind = item['kind'];
+    const scene = typeof item['scene'] === 'string' ? Array.from(item['scene'].replace(/[\u0000-\u001F\u007F]/g, '')).slice(0, PACK_LIMITS.scene).join('') : '';
+    const { data } = sanitizeRecord(PROP_FIELDS[kind], defaults[kind] as never, item['props']);
+    const extras = sanitizeExtras({ [kind]: item['extras'] }, PROP_LABELS).extras[kind];
+    out.push({ id: item['id'], kind, scene, props: data as unknown as PropsState[PropKind], extras });
+  }
+  if (dropped > 0) warnings.push(`線索包有 ${dropped} 件格式不符或超過上限，已略過。`);
+  return out;
 }

@@ -2111,4 +2111,103 @@
   position: absolute;
   color: rgb(40 40 60 / 0.6);
   overflow: visible;
+/* ---------- 線索包：編號與主持人對照表（第五版） ---------- */
+
+.pack-label {
+  position: absolute;
+  right: 3mm;
+  bottom: 2mm;
+  z-index: 20;
+  padding: 0.3mm 1.5mm;
+  border: 0.25mm solid rgb(60 60 60 / 0.5);
+  border-radius: 1mm;
+  background: rgb(255 255 255 / 0.75);
+  color: rgb(40 40 40 / 0.85);
+  font-family: var(--f-title, serif);
+  font-size: 3.2mm;
+  line-height: 1.3;
+}
+
+.gm-sheet {
+  padding: 16mm 14mm;
+  box-sizing: border-box;
+  font-family: var(--f-body, serif);
+}
+
+.gm-title {
+  font-size: 7mm;
+  text-align: center;
+  letter-spacing: 0.3em;
+}
+
+.gm-note {
+  margin-bottom: 4mm;
+  text-align: center;
+  font-size: 3.4mm;
+  color: rgb(150 30 25);
+}
+
+.gm-head,
+.gm-row {
+  display: grid;
+  grid-template-columns: 22mm 52mm 1fr 60mm;
+  column-gap: 3mm;
+  align-items: center;
+}
+
+.gm-head {
+  padding: 1.5mm 0;
+  border-top: 0.4mm solid #222;
+  border-bottom: 0.25mm solid #222;
+  font-size: 3.4mm;
+}
+
+.gm-row {
+  height: 61mm;
+  border-bottom: 0.25mm solid #888;
+}
+
+.gm-no {
+  font-size: 5.5mm;
+  text-align: center;
+}
+
+.gm-thumb {
+  position: relative;
+  width: 50mm;
+  height: 58mm;
+  overflow: hidden;
+}
+
+.gm-thumb > .gm-clone {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  box-shadow: 0 0 0 0.6mm rgb(0 0 0 / 0.15);
+}
+
+.gm-kind {
+  font-size: 4.2mm;
+}
+
+.gm-summary {
+  margin-top: 1mm;
+  font-size: 3.4mm;
+  color: #555;
+}
+
+.gm-scene {
+  font-size: 3.8mm;
+  line-height: 1.5;
+}
+
+@media print {
+  .pack-scaler {
+    break-after: page;
+  }
+
+  .pack-scaler:last-child {
+    break-after: auto;
+  }
 }

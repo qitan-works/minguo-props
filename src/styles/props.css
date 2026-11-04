@@ -1519,3 +1519,48 @@
     cursor: pointer;
   }
 }
+
+/* 直式報頭（照民初報紙）：英文報名橫排粗體大寫、號數與定價各在一個框裡 */
+.nf-mh > .nf-mh-en-block {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-align: center;
+}
+
+.nf-mh > .nf-mh-cell {
+  box-sizing: border-box;
+  border: 0.25mm solid currentColor;
+  text-align: center;
+  letter-spacing: 0.08em;
+}
+
+/* 頂部橫排報頭左右的報耳 */
+.nf-mh > .nf-mh-ear {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  padding: 0.6mm 0.8mm;
+  border: 0.3mm solid currentColor;
+  white-space: normal;
+}
+
+.nf-mh-ear-head {
+  flex: none;
+  padding-bottom: 0.4mm;
+  border-bottom: 0.2mm solid currentColor;
+  font-family: var(--f-title);
+  font-weight: 700;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.nf-mh-ear-body {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  padding-top: 0.5mm;
+  writing-mode: vertical-rl;
+  line-height: 1.35;
+  letter-spacing: 0.04em;
+}

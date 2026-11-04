@@ -495,47 +495,75 @@ function mastheadBox(data: NewspaperData, g: BroadsheetGeometry, r: Rect): HTMLE
   const box = h('header', { class: ['nf-mh', `nf-mh-${g.layout}`], style: { left: mm(r.x), top: mm(r.y), width: mm(r.w), height: mm(r.h) } });
   const small = Math.max(2.6, g.cell * 0.95);
   if (g.layout === 'right') {
-    // 右緣一行郵政掛號字樣；上方報名大字直排；下方由右而左排日期、舊曆、號數、定價，最左是英文報名
+    // 照民初報紙的直式報頭：右緣一行日期（即舊曆、星期），左緣一行郵政掛號字樣；中間報名大字直排，
+    // 下面英文報名橫排、粗體大寫分成幾行，再下面號數與定價各在一個框裡（橫排由右而左）
     const pad = 1.6;
-    const lines = [date, [weekday, lunar].filter(Boolean).join('　'), data.issue, data.price].filter(Boolean);
     const noteW = small * 1.25;
-    const innerW = r.w - 2 * pad - noteW - 0.6;
-    const titleSize = Math.max(small * 2, Math.min(innerW / 1.08, ((r.h - 2 * pad) * 0.6) / name.length));
-    const titleH = name.length * titleSize * 1.04;
-    const noteX = r.w - pad - noteW;
-    box.appendChild(h('div', { class: 'nf-mh-note vt', text: '中華郵政特准掛號認為新聞紙類', style: { left: mm(noteX), top: mm(pad + 1), width: mm(noteW), height: mm(r.h - 2 * pad - 2), 'font-size': mm(small * 0.8) } }));
-    box.appendChild(h('div', { class: 'nf-mh-title vt', text: name.join(''), style: { left: mm(pad + (innerW - titleSize * 1.08) / 2), top: mm(pad + 1.2), width: mm(titleSize * 1.08), height: mm(titleH), 'font-size': mm(titleSize) } }));
-    const top = pad + 1.2 + titleH + 1.5;
-    const restH = r.h - top - pad - 0.5;
-    const infoW = Math.min(small * 1.45, innerW / (lines.length + (data.englishName ? 1 : 0)));
-    let x = noteX - 0.6;
-    box.appendChild(h('div', { class: 'nf-mh-rule', style: { left: mm(pad + 0.4), top: mm(top - 0.9), width: mm(innerW - 0.4) } }));
-    for (const text of lines) {
-      x -= infoW;
-      const size = Math.min(small, infoW / 1.25, restH / Math.max(6, Array.from(text).length));
-      box.appendChild(h('div', { class: 'nf-mh-line vt', text, style: { left: mm(x), top: mm(top), width: mm(infoW), height: mm(restH), 'font-size': mm(size) } }));
+    const innerX = pad + noteW + 0.6;
+    const innerW = r.w - 2 * (pad + noteW + 0.6);
+    const dateLine = [date, lunar ? `（即${lunar}）` : '', weekday ? `（${weekday}）` : ''].join('');
+    const words = data.englishName.toUpperCase().split(/\s+/).filter(Boolean);
+    const enLines: string[] = [];
+    for (const w of words) {
+      const last = enLines[enLines.length - 1];
+      if (last !== undefined && (last.length + 1 + w.length) * 0.7 * small <= innerW) enLines[enLines.length - 1] = `${last} ${w}`;
+      else enLines.push(w);
     }
-    if (data.englishName) {
-      const enW = Math.max(infoW, x - pad);
-      box.appendChild(h('div', { class: 'nf-mh-en', text: data.englishName.toUpperCase(), style: { left: mm(pad), top: mm(top), width: mm(Math.min(enW, x - pad)), height: mm(restH), 'font-size': mm(Math.min(small * 0.95, restH / Math.max(12, data.englishName.length * 0.7))) } }));
+    const longest = Math.max(1, ...enLines.map((l) => l.length));
+    const enSize = Math.min(small * 1.25, innerW / (longest * 0.72));
+    const boxH = small * 1.7;
+    const below = (enLines.length ? enLines.length * enSize * 1.15 + 1.2 : 0) + (data.issue ? boxH + 1 : 0) + (data.price ? boxH + 1 : 0);
+    const titleSize = Math.max(small * 2, Math.min(innerW / 1.08, (r.h - 2 * pad - 2.5 - below) / (name.length * 1.04)));
+    const titleH = name.length * titleSize * 1.04;
+    box.appendChild(h('div', { class: 'nf-mh-line vt', text: dateLine, style: { left: mm(r.w - pad - noteW), top: mm(pad + 1), width: mm(noteW), height: mm(r.h - 2 * pad - 2), 'font-size': mm(Math.min(small * 0.85, (r.h - 2 * pad - 2) / Math.max(12, Array.from(dateLine).length))) } }));
+    box.appendChild(h('div', { class: 'nf-mh-note vt', text: '中華郵政特准掛號認為新聞紙類', style: { left: mm(pad), top: mm(pad + 1), width: mm(noteW), height: mm(r.h - 2 * pad - 2), 'font-size': mm(small * 0.8) } }));
+    box.appendChild(h('div', { class: 'nf-mh-title vt', text: name.join(''), style: { left: mm(innerX + (innerW - titleSize * 1.08) / 2), top: mm(pad + 1.2), width: mm(titleSize * 1.08), height: mm(titleH), 'font-size': mm(titleSize) } }));
+    let y = pad + 1.2 + titleH + 1.2;
+    if (enLines.length) {
+      box.appendChild(h('div', { class: 'nf-mh-en-block', style: { left: mm(innerX), top: mm(y), width: mm(innerW), 'font-size': mm(enSize), 'line-height': mm(enSize * 1.15) } }, ...enLines.map((l) => h('div', { text: l }))));
+      y += enLines.length * enSize * 1.15 + 1.2;
+    }
+    for (const text of [data.issue, data.price].filter(Boolean)) {
+      const size = Math.min(small * 1.05, (innerW - 1.6) / Math.max(4, Array.from(text).length));
+      box.appendChild(h('div', { class: 'nf-mh-cell rtl-line', text, style: { left: mm(innerX), top: mm(y), width: mm(innerW), height: mm(boxH), 'font-size': mm(size), 'line-height': mm(boxH) } }));
+      y += boxH + 1;
     }
   } else {
-    // 角落或頂部橫排
+    // 角落或頂部橫排。頂部橫排時左右各有一個「報耳」小框（照當時報紙的習慣，放啟事與廣告刊例；文字為原創）
     const pad = 1.4;
+    const ear = g.layout === 'top' ? Math.min(r.w * 0.16, 36) : 0;
+    const x0 = pad + (ear ? ear + 1.2 : 0);
+    const w0 = r.w - 2 * x0;
     const infoH = small * 1.25;
     const rowsOfInfo = 2 + (data.englishName ? 1 : 0);
-    const titleSize = Math.min((r.h - 2 * pad - rowsOfInfo * infoH) * 0.95, ((r.w - 2 * pad) * 0.9) / name.length);
-    box.appendChild(h('div', { class: 'nf-mh-title rtl-line', text: name.join(''), style: { left: mm(pad), top: mm(pad), width: mm(r.w - 2 * pad), height: mm(titleSize * 1.1), 'font-size': mm(titleSize), 'line-height': mm(titleSize * 1.1) } }));
+    const titleSize = Math.min((r.h - 2 * pad - rowsOfInfo * infoH) * 0.95, (w0 * 0.9) / name.length);
+    box.appendChild(h('div', { class: 'nf-mh-title rtl-line', text: name.join(''), style: { left: mm(x0), top: mm(pad), width: mm(w0), height: mm(titleSize * 1.1), 'font-size': mm(titleSize), 'line-height': mm(titleSize * 1.1) } }));
     let y = pad + titleSize * 1.12;
     if (data.englishName) {
-      box.appendChild(h('div', { class: 'nf-mh-en-h', text: data.englishName.toUpperCase(), style: { left: mm(pad), top: mm(y), width: mm(r.w - 2 * pad), height: mm(infoH), 'font-size': mm(small * 0.9), 'line-height': mm(infoH) } }));
+      box.appendChild(h('div', { class: 'nf-mh-en-h', text: data.englishName.toUpperCase(), style: { left: mm(x0), top: mm(y), width: mm(w0), height: mm(infoH), 'font-size': mm(small * 0.9), 'line-height': mm(infoH) } }));
       y += infoH;
     }
     const row1 = [date, weekday].filter(Boolean).join('　') + (lunar ? `（即${lunar}）` : '');
     const row2 = [data.issue, data.price].filter(Boolean).join('　　');
     for (const text of [row1, row2]) {
-      box.appendChild(h('div', { class: 'nf-mh-info rtl-line', text, style: { left: mm(pad), top: mm(y), width: mm(r.w - 2 * pad), height: mm(infoH), 'font-size': mm(Math.min(small, ((r.w - 2 * pad) / Math.max(10, Array.from(text).length)) * 0.98)), 'line-height': mm(infoH) } }));
+      box.appendChild(h('div', { class: 'nf-mh-info rtl-line', text, style: { left: mm(x0), top: mm(y), width: mm(w0), height: mm(infoH), 'font-size': mm(Math.min(small, (w0 / Math.max(10, Array.from(text).length)) * 0.98)), 'line-height': mm(infoH) } }));
       y += infoH;
+    }
+    if (ear) {
+      const ears = [
+        { x: r.w - pad - ear - 0.6, head: '本報特別啟事', body: '本報增設本埠分館，代收廣告與訂閱。外埠函購，郵票十足通用。' },
+        { x: pad + 0.6, head: '廣告刊例', body: '封面每行每日大洋二角，長期另議；各欄刊例，函索即寄。' },
+      ];
+      for (const e of ears) {
+        box.appendChild(
+          h(
+            'div',
+            { class: 'nf-mh-ear', style: { left: mm(e.x), top: mm(pad + 0.6), width: mm(ear), height: mm(r.h - 2 * pad - 1.2) } },
+            h('div', { class: 'nf-mh-ear-head', text: e.head, style: { 'font-size': mm(Math.min(small * 1.1, (ear - 2) / Array.from(e.head).length)) } }),
+            h('div', { class: 'nf-mh-ear-body', text: e.body, style: { 'font-size': mm(small * 0.78) } }),
+          ),
+        );
+      }
     }
   }
   return box;

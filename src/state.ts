@@ -12,7 +12,7 @@
 // 匯入時只保留已知欄位；型別不符的欄位改用預設值並提示。第一版（version 1）的存檔可以直接匯入。
 
 import { cardDefaults, cardFields, type CardData } from './props/card.ts';
-import { defaultExtras, sanitizeExtras, type ExtrasState } from './props/extras.ts';
+import { compactExtras, defaultExtras, sanitizeExtras, type ExtrasState } from './props/extras.ts';
 import { letterDefaults, letterFields, type LetterData } from './props/letter.ts';
 import { newspaperDefaults, newspaperFields, type NewspaperData } from './props/newspaper.ts';
 import type { Field } from './props/schema.ts';
@@ -77,7 +77,7 @@ export interface SaveFile {
   readonly savedAt: string;
   readonly active: PropKind;
   readonly props: PropsState;
-  readonly extras: ExtrasState;
+  readonly extras: Record<keyof ExtrasState, unknown>;
 }
 
 export function toSaveFile(state: AppState, now: Date = new Date()): SaveFile {
@@ -87,7 +87,7 @@ export function toSaveFile(state: AppState, now: Date = new Date()): SaveFile {
     savedAt: now.toISOString(),
     active: state.active,
     props: state.props,
-    extras: state.extras,
+    extras: compactExtras(state.extras),
   };
 }
 

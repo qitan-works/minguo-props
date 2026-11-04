@@ -18,8 +18,15 @@ export interface BlockPanelOptions {
   readonly fontOptions: readonly { readonly value: string; readonly label: string }[];
   /** 有沒有改過（可以還原）。 */
   readonly edited: boolean;
+  /** 報紙開了大字模式（小號內文實際印成中號）。 */
+  readonly bigText?: boolean;
   onStyle(patch: Partial<BlockStyle>): void;
   onAction(action: BlockAction): void;
+}
+
+/** 內文大小的選項；大字模式下「小」實際印成中號，在選項上註明。 */
+export function bodySizeOptions(bigText: boolean): readonly { readonly value: (typeof BODY_SIZES)[number]['value']; readonly label: string }[] {
+  return BODY_SIZES.map((x) => (bigText && x.value === 's' ? { value: x.value, label: `${x.label}（大字模式下為中）` } : x));
 }
 
 function field(label: string, control: HTMLElement, hint?: string): HTMLElement {
@@ -92,7 +99,7 @@ export function buildBlockPanel(o: BlockPanelOptions): HTMLElement {
       field('標題樣式', select('標題樣式', TITLE_STYLES, s.titleStyle, (v) => set({ titleStyle: v }))),
       field('括號或符號', select('括號或符號', TITLE_MARKS, s.titleMark, (v) => set({ titleMark: v }))),
       field('內文字型', select('內文字型', fonts, s.bodyFont, (v) => set({ bodyFont: v }))),
-      field('內文大小', select('內文大小', BODY_SIZES, s.bodySize, (v) => set({ bodySize: v }))),
+      field('內文大小', select('內文大小', bodySizeOptions(o.bigText === true), s.bodySize, (v) => set({ bodySize: v })), o.bigText && s.bodySize === 's' ? '大字模式下，小號內文印成中號。' : undefined),
       field('框線', select('框線', FRAMES, s.frame, (v) => set({ frame: v }))),
       ...(s.frame === 'pattern' ? [field('花邊圖樣', select('花邊圖樣', PATTERNS, s.pattern, (v) => set({ pattern: v })))] : []),
       ...(s.kind === 'picture' || s.kind === 'ad'

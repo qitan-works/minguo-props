@@ -16,6 +16,37 @@ export const DOC_TYPES = [
 ] as const;
 export type DocType = (typeof DOC_TYPES)[number]['value'];
 
+/** 驗屍報告人形圖上印痕的位置（死者的左右）。 */
+export const MARK_SPOTS = [
+  { value: 'head', label: '頭' },
+  { value: 'chest', label: '左胸' },
+  { value: 'belly', label: '腹' },
+  { value: 'leftArm', label: '左臂' },
+  { value: 'rightArm', label: '右臂' },
+  { value: 'leftLeg', label: '左腿' },
+  { value: 'rightLeg', label: '右腿' },
+] as const;
+
+/**
+ * 人形圖（寬 40、高 100 的座標，正面，死者的左邊在圖的右邊）上印痕的圓心。
+ * 左胸照原本的排法（三個排成弧）；其他位置沿著那個部位往下排。數量 0～5。
+ */
+export function autopsyMarks(spot: string, count: number): { readonly cx: number; readonly cy: number }[] {
+  const n = Math.max(0, Math.min(5, Math.round(count)));
+  const at: Record<string, { x: number; y: number; dx: number; dy: number }> = {
+    head: { x: 18.4, y: 5.5, dx: 1.6, dy: 1.2 },
+    chest: { x: 23.5, y: 27, dx: 1.6, dy: 2.4 },
+    belly: { x: 18.4, y: 38, dx: 1.6, dy: 2.4 },
+    leftArm: { x: 31.5, y: 27, dx: 0.5, dy: 3 },
+    rightArm: { x: 8.5, y: 27, dx: -0.5, dy: 3 },
+    leftLeg: { x: 25.5, y: 60, dx: 0.2, dy: 4.5 },
+    rightLeg: { x: 14.5, y: 60, dx: -0.2, dy: 4.5 },
+  };
+  const key = spot in at ? spot : 'chest';
+  const p = at[key] as { x: number; y: number; dx: number; dy: number };
+  return Array.from({ length: n }, (_, i) => ({ cx: p.x + i * p.dx, cy: p.y + i * p.dy - (key === 'chest' && i === 1 ? 0.8 : 0) }));
+}
+
 export const documentFields = [
   {
     key: 'docType',
@@ -40,6 +71,8 @@ export const documentFields = [
   { key: 'docBody', type: 'textarea', label: '正文或附記', group: '文件', maxLength: 800, rows: 5, hint: '地契的契文、病歷的記錄、驗屍的檢驗結果、票券背面的規則。' },
   { key: 'docStamp', type: 'text', label: '印文（留空則不蓋）', group: '文件', maxLength: 12, hint: '信封是郵戳上的地名與日期。' },
   { key: 'docRed', type: 'checkbox', label: '編號印成紅色', group: '文件' },
+  { key: 'markSpot', type: 'select', label: '人形圖上印痕的位置', group: '文件', options: MARK_SPOTS, showIf: { key: 'docType', in: ['autopsy'] } },
+  { key: 'markCount', type: 'select', label: '印痕數量', group: '文件', options: ['0', '1', '2', '3', '4', '5'].map((v) => ({ value: v, label: `${v} 處` })), showIf: { key: 'docType', in: ['autopsy'] } },
   fontEraField('字型'),
   ...fontFields('字型'),
   ...conditionFields('紙張狀況', '更多痕跡'),
@@ -105,6 +138,8 @@ export const documentDefaults: DocumentData = {
   ...DOC_TEMPLATES.pawn,
   docDate: '1928-11-05',
   docRed: true,
+  markSpot: 'chest',
+  markCount: '3',
   fontEra: 'custom',
   fontMasthead: 'wang-zhong-li',
   fontTitle: 'wang-zhong-ming',

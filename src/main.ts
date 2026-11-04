@@ -941,6 +941,7 @@ function blockPanel(): HTMLElement | null {
     edited: !!edit,
     titlePreview: placed.band?.lines.map((l) => l.text).join('') ?? head?.glyphs.map((g) => g.ch).join('') ?? placed.ad?.big ?? placed.table?.title ?? placed.toc?.title ?? placed.picture?.caption ?? '',
     fontOptions: FONT_OPTIONS,
+    bigText: state.props.newspaper.bigText === true,
     onStyle: (patch) => editBlock(id, patch),
     onAction: (action) => blockAction(id, action),
   });

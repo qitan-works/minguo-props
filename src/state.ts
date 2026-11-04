@@ -12,6 +12,7 @@
 // 匯入時只保留已知欄位；型別不符的欄位改用預設值並提示。第一版（version 1）的存檔可以直接匯入。
 
 import { cardDefaults, cardFields, type CardData } from './props/card.ts';
+import { relicDefaults, relicFields, type RelicData } from './props/relic.ts';
 import { defaultExtras, sanitizeExtras, type ExtrasState } from './props/extras.ts';
 import { letterDefaults, letterFields, type LetterData } from './props/letter.ts';
 import { newspaperDefaults, newspaperFields, type NewspaperData } from './props/newspaper.ts';
@@ -24,7 +25,7 @@ export const SAVE_VERSION = 2;
 /** 匯入檔大小上限（字元數），照片以 data URL 存放，所以留得寬一些。 */
 export const MAX_SAVE_LENGTH = 32 * 1024 * 1024;
 
-export const PROP_KINDS = ['newspaper', 'telegram', 'letter', 'card'] as const;
+export const PROP_KINDS = ['newspaper', 'telegram', 'letter', 'card', 'relic'] as const;
 export type PropKind = (typeof PROP_KINDS)[number];
 
 export const PROP_LABELS: Readonly<Record<PropKind, string>> = {
@@ -32,6 +33,7 @@ export const PROP_LABELS: Readonly<Record<PropKind, string>> = {
   telegram: '電報',
   letter: '信箋',
   card: '名片／請帖',
+  relic: '古物',
 };
 
 export interface PropsState {
@@ -39,6 +41,7 @@ export interface PropsState {
   readonly telegram: TelegramData;
   readonly letter: LetterData;
   readonly card: CardData;
+  readonly relic: RelicData;
 }
 
 export interface AppState {
@@ -52,6 +55,7 @@ export const PROP_FIELDS: { readonly [K in PropKind]: readonly Field[] } = {
   telegram: telegramFields,
   letter: letterFields,
   card: cardFields,
+  relic: relicFields,
 };
 
 export function defaultState(): AppState {
@@ -62,6 +66,7 @@ export function defaultState(): AppState {
       telegram: { ...telegramDefaults },
       letter: { ...letterDefaults },
       card: { ...cardDefaults },
+      relic: { ...relicDefaults },
     },
     extras: defaultExtras(),
   };
@@ -146,6 +151,7 @@ export function parseSaveObject(input: unknown): ParseResult {
     telegram: load('telegram', telegramFields, telegramDefaults),
     letter: load('letter', letterFields, letterDefaults),
     card: load('card', cardFields, cardDefaults),
+    relic: load('relic', relicFields, relicDefaults),
   };
 
   const extrasResult = sanitizeExtras(input['extras'], PROP_LABELS);

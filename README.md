@@ -12,6 +12,12 @@
 | --- | --- | --- | --- | --- |
 | ![整版報紙](docs/samples/newspaper-full.jpg) | ![剪報](docs/samples/cut-torn.jpg) | ![電報](docs/samples/telegram.jpg) | ![信箋](docs/samples/letter.jpg) | ![名片](docs/samples/card.jpg) ![請帖](docs/samples/invitation.jpg) |
 
+古物（第五版）：古籍殘頁（單頁、對開、局部）、碑文拓片、符咒（加了焦痕與血跡的在最右）：
+
+| 古籍殘頁 | 對開 | 局部（朱筆句讀、眉批、裝訂孔） | 碑文拓片 | 符咒 | 焦痕與血跡 |
+| --- | --- | --- | --- | --- | --- |
+| ![](docs/samples/relic-book.jpg) | ![](docs/samples/relic-book-spread.jpg) | ![](docs/samples/relic-book-detail.jpg) | ![](docs/samples/relic-rubbing.jpg) | ![](docs/samples/relic-talisman.jpg) | ![](docs/samples/relic-talisman-burnt.jpg) |
+
 | 火場搶出的信 | 泡過海水的日記 | 死者口袋裡揉爛的電報 | 地窖發霉的契據 | 被撕掉一半的筆記 | 塵封圖書館的剪報 |
 | --- | --- | --- | --- | --- | --- |
 | ![](docs/samples/preset-fire-letter.jpg) | ![](docs/samples/preset-sea-diary.jpg) | ![](docs/samples/preset-pocket-telegram.jpg) | ![](docs/samples/preset-cellar-deed.jpg) | ![](docs/samples/preset-torn-notes.jpg) | ![](docs/samples/preset-library-clipping.jpg) |
@@ -109,6 +115,16 @@
    手寫風格字型，墨色可選。
 4. **名片／請帖**：名片尺寸 90×54 mm（直式或橫式），名片含機關職銜、姓名、字號、籍貫、住址與電話；
    請帖為大紅底金字的直排格式。可單張列印，或在一張 A4 上拼版 10 張並附裁切線。
+5. **古物**（第五版，恐怖調查類跑團用的三件古物；內容與筆畫全部原創）：
+   - **古籍殘頁**：線裝書的單頁（半葉，A5）或對開（整葉攤開，A4 橫式）。版框（四周雙邊、四周單邊、左右雙邊）、界行、
+     版心（書名、單魚尾或上下雙魚尾、象鼻、卷次、頁碼），明體刻本的字可加木刻質感（字邊毛、墨色不均）；
+     刻本不印標點，正文裡的標點改成朱筆句讀（字旁紅點），另可隨機加朱筆圈（強調的字）與天頭的朱筆眉批；
+     蟲蛀、缺頁（撕掉一半、手撕）用紙張狀況，另有四眼訂的裝訂孔。內文是仿文言的原創文字。
+   - **碑文拓片**：墨拓（黑底、字是紙色），拓包拍打的深淺不均、紙張摺疊收藏的摺痕、墨拓外緣不整齊、
+     碑額、石碑上刻的邊框；碑文殘缺剝落（集中在邊角或一整片，殘缺程度可調），可加兩方收藏者鈐印（白文、朱文）。
+   - **符咒**（符籙）：黃紙朱砂，符頭（帶鉤的短豎與一道冠）、符膽（中軸與兩側的迴圈、折線、眼形，中間直排寫字）、
+     符腳（收成螺旋或折尾），兩側小字與朱印。筆畫由種子隨機組合，是原創圖形，不抄任何真實流派的符；可疊血跡（裝飾）與焦痕（紙張狀況）。
+   三件都接紙張狀況、裝飾、字型與列印，種子換一個就重抽圈點、剝落與符的筆畫。
 
 共通功能：
 
@@ -398,7 +414,7 @@ src/
                       文字層標記、裝飾形狀、越寫越亂、舊曆、整版排版（lib/newspaper/：分段網格 sections、
                       版面類型 pageplan、區塊樣式 blockstyle、內容分配 content、表格與目錄 tables、
                       欄內流排 flow、廣告 ads、句讀 punctuation、鉛字質感 press、紙面座標 sheetgeom）
-  props/              四種道具的欄位定義、預設內容、紙張狀況與情境預設、年代預設（eras）、存檔中的結構化資料
+  props/              五種道具（含第五版的古物 relic）的欄位定義、預設內容、紙張狀況與情境預設、年代預設（eras）、存檔中的結構化資料
   render/             四種道具的版面、紙張狀況、裝飾、報紙的線條插圖、花邊與空心字
   ui/                 表單產生器、照片處理、新聞條目、裁切、裝飾編輯、整版區塊設定、預覽選單
   styles/             介面、道具與列印樣式

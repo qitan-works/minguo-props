@@ -9,6 +9,8 @@ export interface PackEditorOptions {
   readonly entries: readonly PackEntry[];
   readonly current: PropKind;
   readonly previewing: boolean;
+  /** 正在只預覽網址裡的線索包（件數；0 表示沒有）。 */
+  readonly sharedPreview: number;
   /** 分享網址（按過「產生分享網址」才有）。 */
   readonly shareUrl: string | null;
   onAdd(): void;
@@ -69,11 +71,12 @@ export function buildPackEditor(o: PackEditorOptions): HTMLElement {
       class: 'form-hint',
       text: '把做好的道具一件件加進來，自動編號為線索一、二……；預覽整包時會依序排好所有道具，最後附主持人對照表（縮圖、編號、在哪一幕給），按列印就一次印出。加入時存的是當下的內容，之後再改表單不會影響已加入的那一件（可以「用目前的內容取代」）。',
     }),
+    o.sharedPreview ? h('p', { class: 'form-hint pack-shared', text: `正在預覽網址裡的線索包（${o.sharedPreview} 件，沒有存）。下面列的是你自己的線索包；按「回到目前的道具」結束預覽。` }) : null,
     h(
       'div',
       { class: 'pack-buttons' },
       button(`把目前的${PROP_LABELS[o.current]}加入線索包`, () => o.onAdd(), entries.length >= PACK_LIMITS.entries),
-      button(o.previewing ? '回到目前的道具' : '預覽整包並列印', () => o.onPreview(!o.previewing), entries.length === 0),
+      button(o.previewing ? '回到目前的道具' : '預覽整包並列印', () => o.onPreview(!o.previewing), entries.length === 0 && !o.previewing),
       button('產生分享網址', () => o.onShare(), entries.length === 0),
     ),
     share,

@@ -35,13 +35,15 @@ import {
   serializeState,
   updateExtras,
   updateProp,
+  combinePack,
   sanitizePack,
+  type SharedPackChoice,
   type AppState,
   type PackEntry,
   type PropKind,
 } from './state.ts';
 import { buildPackEditor } from './ui/pack.ts';
-import { MAX_SHARE_CHARS, SHARE_PREFIX, clueLabel, compactAgainst, decodeShare, encodeShare, summaryOf } from './lib/pack.ts';
+import { MAX_SHARE_CHARS, SHARE_PREFIX, ShareTooLargeError, clueLabel, compactAgainst, decodeShare, encodeShare, summaryOf } from './lib/pack.ts';
 import { PAPER_SIZES, isPaperKey } from './props/common.ts';
 import { h } from './ui/dom.ts';
 import { buildForm, type FieldValue } from './ui/form.ts';
@@ -289,6 +291,13 @@ function rebuildForm(): void {
 /** 預覽整包（不存檔）。 */
 let packMode = false;
 let shareUrl: string | null = null;
+/** 只預覽、不存的線索包（從網址打開、選了「只預覽」時）。結束預覽就丟掉。 */
+let sharedPreview: PackEntry[] | null = null;
+
+/** 目前要預覽的線索包：只預覽網址裡的那一包時用它，否則用自己的。 */
+function previewEntries(): readonly PackEntry[] {
+  return sharedPreview ?? state.pack;
+}
 
 function setPack(pack: readonly PackEntry[]): void {
   state = { ...state, pack };
@@ -308,6 +317,7 @@ function packEditor(kind: PropKind): HTMLElement {
     entries: state.pack,
     current: kind,
     previewing: packMode,
+    sharedPreview: sharedPreview?.length ?? 0,
     shareUrl,
     onAdd() {
       setPack([...state.pack, snapshot(kind, newId('k'), '')]);
@@ -329,6 +339,7 @@ function packEditor(kind: PropKind): HTMLElement {
     },
     onPreview(on) {
       packMode = on;
+      if (!on) sharedPreview = null;
       rebuildForm();
       queueRender();
     },
@@ -417,24 +428,24 @@ function gmSheets(entries: readonly PackEntry[], sheets: readonly HTMLElement[])
   return pages;
 }
 
-function renderPackPreview(): void {
+function renderPackPreview(entries: readonly PackEntry[]): void {
   const sheets: HTMLElement[] = [];
   const scalers: HTMLElement[] = [];
-  state.pack.forEach((e, i) => {
+  entries.forEach((e, i) => {
     const sheet = entrySheet(e);
     sheet.appendChild(h('div', { class: 'pack-label', text: clueLabel(i) }));
     sheets.push(sheet);
     scalers.push(h('div', { class: 'sheet-scaler pack-scaler' }, sheet));
   });
   els.stage.replaceChildren(...scalers);
-  state.pack.forEach((e, i) => {
+  entries.forEach((e, i) => {
     const sheet = sheets[i] as HTMLElement;
     fitNewspaperToContent(sheet);
     applyPaperEffects(sheet);
     drawDecorations(sheet, e.extras.decorations, null);
   });
   // 對照表的縮圖要在每一件畫好紙張狀況之後再複製
-  for (const gm of gmSheets(state.pack, sheets)) els.stage.appendChild(h('div', { class: 'sheet-scaler pack-scaler' }, gm));
+  for (const gm of gmSheets(entries, sheets)) els.stage.appendChild(h('div', { class: 'sheet-scaler pack-scaler' }, gm));
   els.stage.classList.add('pack-stage');
   document.documentElement.dataset['page'] = sheets[0]?.dataset['page'] ?? 'a4-portrait';
   fitPreview();
@@ -616,8 +627,8 @@ function renderPreview(): void {
   closePopover();
   lastFull = null;
   els.stage.classList.remove('pack-stage');
-  if (packMode && state.pack.length) {
-    renderPackPreview();
+  if (packMode && previewEntries().length) {
+    renderPackPreview(previewEntries());
     return;
   }
   let sheet: HTMLElement;
@@ -1192,20 +1203,57 @@ renderPreview();
 void loadSharedPack();
 
 /** 網址的 # 後面帶著線索包時，載入它並預覽整包。 */
+/** 對話框：本機已有線索包時，網址裡的那一包要取代、附加、或只預覽。按 Esc 或關掉視同只預覽。 */
+function askSharedPackChoice(local: number, incoming: number): Promise<SharedPackChoice> {
+  return new Promise((resolve) => {
+    const dialog = h('dialog', { class: 'pack-dialog', attrs: { 'aria-labelledby': 'pack-dialog-title' } });
+    const pick = (c: SharedPackChoice): void => {
+      dialog.close();
+      dialog.remove();
+      resolve(c);
+    };
+    const btn = (text: string, c: SharedPackChoice, primary = false): HTMLButtonElement => {
+      const b = h('button', { class: ['btn', primary && 'btn-primary'], attrs: { type: 'button', 'data-choice': c }, text });
+      b.addEventListener('click', () => pick(c));
+      return b;
+    };
+    const preview = btn('只預覽，不存', 'preview', true);
+    dialog.append(
+      h('h2', { attrs: { id: 'pack-dialog-title' }, text: '網址裡有一包線索' }),
+      h('p', { text: `網址裡的線索包有 ${incoming} 件，你這台電腦上已經有 ${local} 件。要怎麼處理？` }),
+      h('div', { class: 'pack-dialog-buttons' }, preview, btn('附加在後面', 'append'), btn('取代我的線索包', 'replace')),
+    );
+    dialog.addEventListener('cancel', (e) => {
+      e.preventDefault();
+      pick('preview');
+    });
+    document.body.appendChild(dialog);
+    dialog.showModal();
+    preview.focus();
+  });
+}
+
 async function loadSharedPack(): Promise<void> {
   if (!location.hash.startsWith(SHARE_PREFIX)) return;
   try {
     const warnings: string[] = [];
     const pack = sanitizePack(await decodeShare(location.hash.slice(SHARE_PREFIX.length)), warnings);
     if (pack.length === 0) throw new Error('empty');
-    state = { ...state, pack };
+    // 本機已有線索包時先問：取代、附加在後面、或只預覽不存；預設（關掉對話框）不覆蓋
+    const choice: SharedPackChoice = state.pack.length === 0 ? 'replace' : await askSharedPackChoice(state.pack.length, pack.length);
+    const next = combinePack(state.pack, pack, choice);
     packMode = true;
-    scheduleSave();
+    if (next) {
+      state = { ...state, pack: next };
+      sharedPreview = null;
+      scheduleSave();
+    } else sharedPreview = pack;
     rebuildForm();
     queueRender();
-    setStatus(`已從網址載入線索包（${pack.length} 件）。${warnings.join('')}`, warnings.length ? 'warn' : 'info');
-  } catch {
-    setStatus('網址裡的線索包無法讀取（可能被截斷了）。', 'error');
+    const what = choice === 'preview' ? `正在預覽網址裡的線索包（${pack.length} 件，沒有存）；按「回到目前的道具」結束預覽，自己的線索包不受影響。` : choice === 'append' ? `已把網址裡的 ${pack.length} 件附加在線索包後面。` : `已從網址載入線索包（${pack.length} 件）。`;
+    setStatus(`${what}${warnings.join('')}`, warnings.length ? 'warn' : 'info');
+  } catch (err) {
+    setStatus(err instanceof ShareTooLargeError ? err.message : '網址裡的線索包無法讀取（可能被截斷了）。', 'error');
   }
 }
 void loadCodebook();

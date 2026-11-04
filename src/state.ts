@@ -237,3 +237,28 @@ export function sanitizePack(raw: unknown, warnings: string[] = []): PackEntry[]
   if (dropped > 0) warnings.push(`線索包有 ${dropped} 件格式不符或超過上限，已略過。`);
   return out;
 }
+
+/** 打開帶線索包的網址、本機已有線索包時的選擇。預設（關掉對話框）是只預覽、不存。 */
+export type SharedPackChoice = 'replace' | 'append' | 'preview';
+
+/**
+ * 依選擇算出要存的線索包（只預覽時回傳 null，表示本機的線索包不變）。
+ * 附加時，編號和本機重複的那幾件換一個新編號；總數不超過上限。
+ */
+export function combinePack(local: readonly PackEntry[], incoming: readonly PackEntry[], choice: SharedPackChoice): PackEntry[] | null {
+  if (choice === 'preview') return null;
+  if (choice === 'replace') return incoming.slice(0, PACK_LIMITS.entries);
+  const used = new Set(local.map((e) => e.id));
+  const added = incoming.map((e, i) => {
+    if (!used.has(e.id)) {
+      used.add(e.id);
+      return e;
+    }
+    let n = i;
+    let id = `${e.id}-${n}`;
+    while (used.has(id) || id.length > 40) id = `s${(n += 1)}`;
+    used.add(id);
+    return { ...e, id };
+  });
+  return [...local, ...added].slice(0, PACK_LIMITS.entries);
+}

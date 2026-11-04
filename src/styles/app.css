@@ -803,3 +803,26 @@ textarea:focus-visible {
   flex-direction: column;
   gap: 18px;
 }
+
+.pack-dialog {
+  max-width: 28rem;
+  padding: 16px 20px;
+  border: 1px solid var(--ui-line);
+  border-radius: 6px;
+}
+
+.pack-dialog h2 {
+  margin: 0 0 8px;
+  font-size: 1.05rem;
+}
+
+.pack-dialog-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.pack-shared {
+  color: #8a4b00;
+}

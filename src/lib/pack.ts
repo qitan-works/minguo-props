@@ -8,6 +8,13 @@ import { toChineseNumber } from './numerals.ts';
 export const SHARE_PREFIX = '#pack=';
 /** 超過這個長度，很多聊天軟體與瀏覽器的網址列會截斷，請改用匯出 JSON。 */
 export const MAX_SHARE_CHARS = 8000;
+/** 讀網址時接受的最長字串（比產生時的上限寬一些）；更長的一律不讀。 */
+export const MAX_SHARE_INPUT = 16000;
+/** 解壓縮後最多 4 MB；超過就中止（防止很小的網址解壓成巨大的資料）。 */
+export const MAX_SHARE_BYTES = 4 * 1024 * 1024;
+
+/** 網址裡的線索包太長或解壓後太大。 */
+export class ShareTooLargeError extends Error {}
 
 export function clueLabel(index: number): string {
   return `線索${toChineseNumber(index + 1)}`;
@@ -59,9 +66,34 @@ export async function encodeShare(value: unknown): Promise<string> {
   return toBase64Url(await pipe(bytes, new CompressionStream('deflate-raw')));
 }
 
-/** encodeShare 的反向；格式不符時丟出錯誤。 */
-export async function decodeShare(text: string): Promise<unknown> {
+/** 邊解壓邊累計大小，超過 limit 位元組就中止並丟出 ShareTooLargeError。 */
+async function inflateLimited(bytes: Uint8Array, limit: number): Promise<Uint8Array> {
+  const reader = new Blob([bytes as BlobPart]).stream().pipeThrough(new DecompressionStream('deflate-raw')).getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > limit) {
+      await reader.cancel().catch(() => undefined);
+      throw new ShareTooLargeError(`網址裡的線索包解壓後超過 ${Math.round(limit / 1024 / 1024)} MB，已停止讀取。`);
+    }
+    chunks.push(value);
+  }
+  const out = new Uint8Array(total);
+  let at = 0;
+  for (const c of chunks) {
+    out.set(c, at);
+    at += c.byteLength;
+  }
+  return out;
+}
+
+/** encodeShare 的反向：先拒絕太長的字串，解壓縮時超過上限就中止；格式不符時丟出錯誤。 */
+export async function decodeShare(text: string, limits: { readonly chars?: number; readonly bytes?: number } = {}): Promise<unknown> {
+  if (text.length > (limits.chars ?? MAX_SHARE_INPUT)) throw new ShareTooLargeError(`網址裡的線索包太長（${text.length} 字元），不讀取。`);
   if (!/^[A-Za-z0-9_-]+$/.test(text)) throw new Error('網址裡的線索包格式不符');
-  const bytes = await pipe(fromBase64Url(text), new DecompressionStream('deflate-raw'));
+  const bytes = await inflateLimited(fromBase64Url(text), limits.bytes ?? MAX_SHARE_BYTES);
   return JSON.parse(new TextDecoder().decode(bytes)) as unknown;
 }

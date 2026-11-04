@@ -10,9 +10,11 @@ import { renderNewspaperFull, type FullPageRender } from './render/newspaper-ful
 import { applyPaperEffects } from './render/effects.ts';
 import { drawDecorations } from './render/decorations.ts';
 import { buildDecorationEditor } from './ui/decorations.ts';
+import { buildFxEditor } from './ui/fx-items.ts';
+import { CLEARED_QUICK, fxStyle, shapeFromPolygon, sizeRange, type FxItem, type PlaceContext } from './lib/fx/catalog.ts';
 import { placeDecoration } from './lib/decorations.ts';
 import { measureMarks } from './render/effects.ts';
-import { PX_PER_MM } from './lib/geometry.ts';
+import { PX_PER_MM, polygonBounds } from './lib/geometry.ts';
 import { parsePreviewZoom, previewScale, serializePreviewZoom, wheelDirection, zoomBy, type PreviewFit, type PreviewZoom, type Size } from './lib/preview.ts';
 import { applyPreset, pickConditions } from './props/conditions.ts';
 import { eraFontPatch, eraPatch, isEra } from './props/eras.ts';
@@ -75,6 +77,8 @@ let lastFull: FullPageRender | null = null;
 /** 整版上點選的區塊（只在畫面上標示，不存檔）。 */
 let selectedBlock: string | null = null;
 let selectedDeco: string | null = null;
+/** 選取中的特效項目（只在畫面上標示，不存檔）。 */
+let selectedFx: string | null = null;
 let codebookFailed = false;
 let saveTimer: number | undefined;
 let renderQueued = false;
@@ -221,6 +225,7 @@ function rebuildForm(): void {
   const panel = kind === 'newspaper' ? blockPanel() : null;
   if (panel) els.form.prepend(panel);
   els.form.appendChild(cropEditor(kind));
+  els.form.appendChild(fxEditor(kind));
   els.form.appendChild(
     buildDecorationEditor({
       decorations: state.extras[kind].decorations,
@@ -308,6 +313,73 @@ function cropEditor(kind: PropKind): HTMLElement {
     h('div', { class: 'crop-buttons' }, polygon, lasso, clear),
     status,
   );
+}
+
+// ---- 特效項目（第五版） ----
+
+function fxPlaceContext(): PlaceContext {
+  const paper = els.stage.querySelector<HTMLElement>('.paper');
+  if (!paper) return { bounds: { x: 0, y: 0, w: 100, h: 100 }, protect: [] };
+  const crop = state.extras[state.active].crop;
+  const w = paper.offsetWidth / PX_PER_MM;
+  const hh = paper.offsetHeight / PX_PER_MM;
+  return { bounds: crop ? polygonBounds(crop) : { x: 0, y: 0, w, h: hh }, protect: measureMarks(paper, 'protect') };
+}
+
+function setFxItems(kind: PropKind, effects: readonly FxItem[]): void {
+  state = updateExtras(state, kind, { effects } as never);
+  queueRender();
+  scheduleSave();
+}
+
+function patchFx(id: string, patch: (d: FxItem) => FxItem): void {
+  const kind = state.active;
+  setFxItems(kind, state.extras[kind].effects.map((d) => (d.id === id ? patch(d) : d)));
+}
+
+function selectFx(id: string | null): void {
+  selectedFx = id;
+  rebuildForm();
+  queueRender();
+  if (id) requestAnimationFrame(() => els.form.querySelector('#fx-panel')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }));
+}
+
+function fxEditor(kind: PropKind): HTMLElement {
+  return buildFxEditor({
+    items: state.extras[kind].effects,
+    selectedId: selectedFx,
+    place: fxPlaceContext,
+    conditions: pickConditions(currentValues()),
+    onChange(effects, redraw) {
+      setFxItems(kind, effects);
+      if (redraw) rebuildForm();
+    },
+    onSelect: selectFx,
+    onConvert(effects) {
+      state = updateProp(state, kind, { ...CLEARED_QUICK, preset: 'custom' } as never);
+      setFxItems(kind, effects);
+      rebuildForm();
+      setStatus('已把紙張狀況的效果拆成個別項目，可以逐一調整或刪除。');
+    },
+    onDrawShape(id, tool) {
+      cropSession?.cancel();
+      requestAnimationFrame(() => {
+        cropSession = startCropDrawing(
+          els.stage,
+          tool,
+          (points) => {
+            const r = shapeFromPolygon(points);
+            if (r) patchFx(id, (d) => ({ ...d, x: r.x, y: r.y, size: r.size, shape: r.shape, rotate: 0 }));
+          },
+          () => {
+            cropSession = null;
+            rebuildForm();
+            queueRender();
+          },
+        );
+      });
+    },
+  });
 }
 
 // ---- 預覽 ----
@@ -398,7 +470,7 @@ function renderPreview(): void {
   const scaler = h('div', { class: 'sheet-scaler' }, sheet);
   els.stage.replaceChildren(scaler);
   fitNewspaperToContent(sheet);
-  applyPaperEffects(sheet);
+  applyPaperEffects(sheet, state.extras[state.active].effects, selectedFx);
   drawDecorations(sheet, state.extras[state.active].decorations, selectedDeco);
   fitPreview();
   renderTelegramInfo(telegram);
@@ -684,7 +756,7 @@ function blockAtPoint(clientX: number, clientY: number): string | null {
 
 els.stage.addEventListener('click', (event) => {
   closePopover();
-  if (event.target instanceof Element && event.target.closest('.deco, .crop-overlay')) return;
+  if (event.target instanceof Element && event.target.closest('.deco, .crop-overlay, .fx-hit')) return;
   if (state.active !== 'newspaper' || !lastFull) return;
   const target = event.target instanceof Element ? event.target.closest<HTMLElement>('.nr[data-region-id]') : null;
   // 點在空心字、框線、留白上時，依座標找出是哪個區塊
@@ -757,6 +829,66 @@ els.stage.addEventListener(
     if (dir === 0) return;
     if (event.shiftKey) patchDecoration(hit.id, (d) => ({ rotate: Math.max(-180, Math.min(180, d.rotate + dir * 5)) }));
     else patchDecoration(hit.id, (d) => ({ scale: Math.max(0.2, Math.min(4, d.scale * (dir > 0 ? 1.06 : 1 / 1.06))) }));
+  },
+  { passive: false },
+);
+
+// ---- 特效項目：拖曳移動、Alt＋滾輪縮放、Alt＋Shift＋滾輪旋轉（同裝飾） ----
+
+function fxTarget(event: Event): { g: SVGGElement; id: string; perMm: number } | null {
+  const g = event.target instanceof Element ? event.target.closest<SVGGElement>('g.fx-hit[data-fx-id]') : null;
+  const svg = g?.ownerSVGElement;
+  const id = g?.dataset['fxId'];
+  if (!g || !svg || !id) return null;
+  const perMm = svg.getBoundingClientRect().width / (svg.viewBox.baseVal.width || 1);
+  return { g, id, perMm };
+}
+
+els.stage.addEventListener('pointerdown', (event) => {
+  const hit = fxTarget(event);
+  if (!hit) return;
+  event.preventDefault();
+  if (selectedFx !== hit.id) {
+    selectedFx = hit.id;
+    rebuildForm();
+    if (wideLayout.matches) requestAnimationFrame(() => els.form.querySelector('#fx-panel')?.scrollIntoView({ block: 'nearest' }));
+  }
+  const visuals = [hit.g, ...els.stage.querySelectorAll<SVGGElement>(`.fx-items g[data-fx-item="${hit.id}"]`)];
+  const startX = event.clientX;
+  const startY = event.clientY;
+  let dx = 0;
+  let dy = 0;
+  const move = (e: PointerEvent): void => {
+    dx = (e.clientX - startX) / hit.perMm;
+    dy = (e.clientY - startY) / hit.perMm;
+    for (const v of visuals) v.setAttribute('transform', `translate(${dx.toFixed(2)} ${dy.toFixed(2)})`);
+  };
+  const up = (): void => {
+    window.removeEventListener('pointermove', move);
+    window.removeEventListener('pointerup', up);
+    if (Math.abs(dx) + Math.abs(dy) > 0.05) patchFx(hit.id, (d) => ({ ...d, x: d.x + dx, y: d.y + dy }));
+    else queueRender();
+  };
+  window.addEventListener('pointermove', move);
+  window.addEventListener('pointerup', up);
+});
+
+els.stage.addEventListener(
+  'wheel',
+  (event) => {
+    if (!event.altKey) return;
+    const hit = fxTarget(event);
+    if (!hit) return;
+    event.preventDefault();
+    const dir = wheelDirection(event.deltaY, event.deltaX);
+    if (dir === 0) return;
+    if (event.shiftKey) patchFx(hit.id, (d) => ({ ...d, rotate: ((d.rotate + dir * 5 + 540) % 360) - 180 }));
+    else {
+      patchFx(hit.id, (d) => {
+        const [lo, hi] = sizeRange(fxStyle(d.kind, d.style), d.shape !== null);
+        return { ...d, size: Math.round(Math.max(lo, Math.min(hi, d.size * (dir > 0 ? 1.06 : 1 / 1.06))) * 100) / 100 };
+      });
+    }
   },
   { passive: false },
 );

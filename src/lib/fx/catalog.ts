@@ -73,7 +73,7 @@ function style(value: string, label: string, size: number, sizeLabel: string, o:
 export const FX_STYLES: Readonly<Record<FxKind, readonly FxStyle[]>> = {
   burn: [
     style('hole', '圓形燒穿', 6, '半徑', { strength: 55, tone: 10 }),
-    style('cigarette', '菸頭燙痕', 3, '半徑', { strength: 40, tone: 35, soft: 30 }),
+    style('cigarette', '菸頭燙痕', 3.5, '半徑', { strength: 40, tone: 35, soft: 30 }),
     style('flame', '火舌燒缺的邊', 34, '寬度', { strength: 60, tone: 5, anchor: 'edge' }),
     style('scorch', '只焦不穿', 9, '半徑', { strength: 50, tone: 40, soft: 45 }),
     style('row', '一排燒穿', 2.6, '每個洞的半徑', { strength: 50, tone: 15, count: 5 }),
@@ -220,7 +220,10 @@ export function isFxStyle(kind: FxKind, value: unknown): value is string {
 }
 
 /** 大小滑桿的範圍（公釐）。 */
-export function sizeRange(st: FxStyle): readonly [number, number] {
+export function sizeRange(st: FxStyle, shaped = false): readonly [number, number] {
+  if (shaped) return [1, 500];
+  // 散布型（範圍半徑）的樣式可以大到蓋住整張紙
+  if (st.sizeLabel.includes('範圍')) return [Math.max(0.3, Math.round(st.size * 0.2 * 10) / 10), 300];
   if (st.anchor === 'line') return [20, 500];
   return [Math.max(0.3, Math.round(st.size * 0.2 * 10) / 10), Math.min(500, Math.round(st.size * 4))];
 }
@@ -300,7 +303,7 @@ export function sanitizeFxItem(v: unknown): FxItem | null {
   const seed = isValidSeed(v['seed']) ? v['seed'] : null;
   if (x === null || y === null || seed === null) return null;
   const d = fxDefaults(kind, st);
-  const [minSize, maxSize] = sizeRange(fxStyle(kind, st));
+  const [minSize, maxSize] = sizeRange(fxStyle(kind, st), v['shape'] !== undefined && v['shape'] !== null);
   const opt = (key: string, min: number, max: number, fallback: number): number | null => (v[key] === undefined ? fallback : num(v[key], min, max));
   const rotate = opt('rotate', -360, 360, d.rotate);
   const size = opt('size', minSize, maxSize, d.size);
@@ -498,7 +501,9 @@ export function itemsFromConditions(c: QuickConditions, ctx: PlaceContext, exist
   const all = (): FxItem[] => [...existing, ...out];
   const nextSeed = (): number => 1 + Math.floor(rng() * 2147483000);
   const add = (kind: FxKind, st: string, at: { x: number; y: number; rotate?: number }, patch: Partial<FxItem> = {}): void => {
-    out.push({ ...createFxItem(kind, st, at, nextSeed(), z++, idOf(n++)), ...patch });
+    const made = { ...createFxItem(kind, st, at, nextSeed(), z++, idOf(n++)), ...patch };
+    const [lo, hi] = sizeRange(fxStyle(kind, st), made.shape !== null);
+    out.push({ ...made, size: Math.max(lo, Math.min(hi, made.size)) });
   };
   const quick = (kind: FxKind, st: string, count: number): void => {
     const made = quickGenerate(kind, st, count, nextSeed(), ctx, all(), (i) => idOf(n + i));

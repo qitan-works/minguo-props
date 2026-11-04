@@ -1519,3 +1519,69 @@
     cursor: pointer;
   }
 }
+
+/* ---------- 逐一放置的特效項目（src/render/fx-items.ts） ---------- */
+
+.fx-clipdefs {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+
+.fx-hit-layer {
+  position: absolute;
+  z-index: 5;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.fx-hit-area,
+.fx-hit-dot {
+  fill: transparent;
+}
+
+.fx-hit-edge {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 3;
+}
+
+.fx-hit-frame {
+  fill: none;
+  stroke: none;
+  pointer-events: none;
+}
+
+@media screen {
+  .fx-hit {
+    cursor: move;
+  }
+
+  .fx-hit-area,
+  .fx-hit-dot {
+    pointer-events: all;
+  }
+
+  .fx-hit-edge {
+    pointer-events: stroke;
+  }
+
+  .fx-hit:hover .fx-hit-frame {
+    stroke: rgb(31 90 160 / 0.4);
+    stroke-width: 1px;
+    stroke-dasharray: 3 3;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .fx-hit-selected .fx-hit-frame {
+    stroke: rgb(31 90 160 / 0.85);
+    stroke-width: 1px;
+    stroke-dasharray: 4 3;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .fx-hit-selected .fx-hit-dot {
+    fill: rgb(31 90 160 / 0.45);
+  }
+}

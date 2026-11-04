@@ -182,6 +182,7 @@ function drawHitLayer(o: FxDrawOptions): void {
         'g',
         { class: ['fx-hit', plan.id === o.selectedId && 'fx-hit-selected'], dataset: { fxId: plan.id } },
         s('path', { class: small ? 'fx-hit-area' : 'fx-hit-edge', attrs: { d: closedPath(plan.outline) } }),
+        s('path', { class: 'fx-hit-frame', attrs: { d: closedPath(plan.outline) } }),
         s('circle', { class: 'fx-hit-dot', attrs: { cx: plan.center.x.toFixed(2), cy: plan.center.y.toFixed(2), r: 2.4 } }),
       ),
     );

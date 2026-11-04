@@ -269,14 +269,14 @@ function burn(c: Ctx): void {
   const custom = customShape(c, ir * 0.6);
   if (style === 'scorch') {
     const base = custom ?? roundish(rng, S, ir, 36);
-    const layers = 8;
+    const layers = 10;
     for (let i = 0; i < layers; i++) {
-      const s = 1 - (i / layers) * 0.82;
+      const s = 1 - (i / layers) * 0.85;
       const poly = base.map((p, j) => {
         const wob = 1 + ir * 0.06 * Math.sin(j * 0.7 + i * 1.3);
         return { x: p.x * s * wob, y: p.y * s * wob };
       });
-      fill(c, poly, charColor(Math.round((i / (layers - 1)) * (3 + 6 * k)), 10, c.tone * 100));
+      fill(c, poly, charColor(Math.min(9, Math.round(1 + (i / (layers - 1)) * (3 + 6 * k))), 10, c.tone * 100));
     }
     return;
   }
@@ -289,8 +289,8 @@ function burn(c: Ctx): void {
     cut(c, roundish(rng, S, ir, 28), { char: charScale });
   } else if (style === 'cigarette') {
     const tone = c.tone * 100;
-    fill(c, roundish(rng, S * 2.3, ir * 0.6, 32), charColor(1, 10, tone));
-    for (let i = 0; i < 6; i++) fill(c, roundish(rng, S * (1.9 - i * 0.22), ir, 30), charColor(3 + i, 10, tone));
+    fill(c, roundish(rng, S * 2.2, ir * 0.6, 32), charColor(2, 10, tone));
+    for (let i = 0; i < 6; i++) fill(c, roundish(rng, S * (1.7 - i * 0.17), ir, 30), charColor(Math.min(9, 4 + i), 10, tone));
     fill(c, roundish(rng, S * 0.6, ir, 20), 'rgb(118 110 98 / 0.55)');
     if (k >= 0.55) cut(c, roundish(rng, S * (0.22 + 0.4 * ((k - 0.55) / 0.45)), ir, 18), { rim: 'rgb(10 6 3 / 0.95)' });
   } else if (style === 'flame') {

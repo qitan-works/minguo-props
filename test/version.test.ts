@@ -62,7 +62,7 @@ describe('部署版本', () => {
     const good = new Map<string, string>([
       [`v/${V}/js/main.js`, "import { a } from './lib/a.js';\nconst r = await fetch(new URL('../data/telegraph.json', import.meta.url));"],
       [`v/${V}/js/lib/a.js`, "import { b } from '../ui/b.js';\nexport const a = 1;"],
-      [`v/${V}/css/app.css`, "background: url('data:image/svg+xml,%3Csvg/%3E');"],
+      [`v/${V}/css/app.css`, "background: url('data:image/svg+xml,%3Csvg/%3E'); filter: url('#f-ink');"],
     ]);
     assert.deepEqual(checkVersionedRefs(good, V), []);
   });

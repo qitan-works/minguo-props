@@ -12,6 +12,12 @@
 | --- | --- | --- | --- | --- |
 | ![整版報紙](docs/samples/newspaper-full.jpg) | ![剪報](docs/samples/cut-torn.jpg) | ![電報](docs/samples/telegram.jpg) | ![信箋](docs/samples/letter.jpg) | ![名片](docs/samples/card.jpg) ![請帖](docs/samples/invitation.jpg) |
 
+日常文件（第五版）：船票與火車票、當票、信封、病歷、驗屍報告、地契：
+
+| 船票、火車票 | 當票 | 信封 | 病歷 | 驗屍報告 | 地契 |
+| --- | --- | --- | --- | --- | --- |
+| ![](docs/samples/doc-tickets.jpg) | ![](docs/samples/doc-pawn.jpg) | ![](docs/samples/doc-envelope.jpg) | ![](docs/samples/doc-medical.jpg) | ![](docs/samples/doc-autopsy.jpg) | ![](docs/samples/doc-deed.jpg) |
+
 | 火場搶出的信 | 泡過海水的日記 | 死者口袋裡揉爛的電報 | 地窖發霉的契據 | 被撕掉一半的筆記 | 塵封圖書館的剪報 |
 | --- | --- | --- | --- | --- | --- |
 | ![](docs/samples/preset-fire-letter.jpg) | ![](docs/samples/preset-sea-diary.jpg) | ![](docs/samples/preset-pocket-telegram.jpg) | ![](docs/samples/preset-cellar-deed.jpg) | ![](docs/samples/preset-torn-notes.jpg) | ![](docs/samples/preset-library-clipping.jpg) |
@@ -109,6 +115,15 @@
    手寫風格字型，墨色可選。
 4. **名片／請帖**：名片尺寸 90×54 mm（直式或橫式），名片含機關職銜、姓名、字號、籍貫、住址與電話；
    請帖為大紅底金字的直排格式。可單張列印，或在一張 A4 上拼版 10 張並附裁切線。
+5. **日常文件**（第五版）：船票、火車票、當票、醫院病歷、驗屍報告、地契（賣契）、信封。選了種類就換成那種文件的範本，再改內容：
+   - 船票、火車票：附存根與騎縫的虛線，大字的起訖站、艙位或等級、紅色號碼、背面規則與圓戳。
+   - 當票：店號由右而左、大字「當」、直排的當物、當本、月息、限期，以及當票上常見的規則字句與方印。
+   - 醫院病歷、驗屍報告：表格、手寫的欄位與記錄、主治醫師或檢驗員簽章欄與圓戳；驗屍報告附人形圖與印痕的位置。
+   - 地契：直排的契文、四至、價銀、中人與代筆、民國紀年，紅色官印與一半壓在紙邊外的騎縫印。
+   - 信封：紅框中的收件人、右邊地址、左下寄件人，原創圖案的郵票（印虛構的「霧港郵政」）、郵戳與波浪銷戳。
+   欄位寫成「標籤：內容」，一行一欄。全部是虛構的機構、店號與編號；**不做任何貨幣、鈔票或現行證件**。
+
+   
 
 共通功能：
 

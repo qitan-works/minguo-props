@@ -80,6 +80,7 @@ export interface ExtrasState {
   readonly telegram: PropExtras;
   readonly letter: PropExtras;
   readonly card: PropExtras;
+  readonly document: PropExtras;
 }
 
 export const LIMITS = {
@@ -101,6 +102,7 @@ export function defaultExtras(): ExtrasState {
     telegram: { ...empty },
     letter: { ...empty },
     card: { ...empty },
+    document: { ...empty },
   };
 }
 
@@ -230,6 +232,7 @@ export function sanitizeExtras(input: unknown, labels: Readonly<Record<keyof Ext
       telegram: sanitizeCommon(part('telegram'), labels.telegram, warnings),
       letter: sanitizeCommon(part('letter'), labels.letter, warnings),
       card: sanitizeCommon(part('card'), labels.card, warnings),
+      document: sanitizeCommon(part('document'), labels.document, warnings),
     },
     warnings,
   };

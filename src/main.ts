@@ -5,6 +5,8 @@ import { createSafeStore, type SaveOutcome } from './lib/storage.ts';
 import { createCodebook, encodeTelegram, missingChars, substitutedChars, type Codebook } from './lib/telegraph.ts';
 import { renderCard } from './render/card.ts';
 import { renderLetter } from './render/letter.ts';
+import { renderDocument } from './render/document.ts';
+import { applyDocType } from './props/document.ts';
 import { fitNewspaperToContent, renderNewspaper } from './render/newspaper.ts';
 import { renderNewspaperFull, type FullPageRender } from './render/newspaper-full.ts';
 import { applyPaperEffects } from './render/effects.ts';
@@ -165,6 +167,14 @@ function rebuildForm(): void {
       if (key === 'preset') {
         // 情境預設：一次套用一組紙張狀況，再重建表單讓欄位顯示新值
         state = updateProp(state, kind, applyPreset(pickConditions(currentValues()), String(value)) as never);
+        queueRender();
+        scheduleSave();
+        rebuildForm();
+        return;
+      }
+      if (key === 'docType' && kind === 'document') {
+        // 換文件種類：套上那種文件的範本（機構、編號、欄位、正文、印文），再重建表單
+        state = updateProp(state, 'document', applyDocType(state.props.document, String(value)));
         queueRender();
         scheduleSave();
         rebuildForm();
@@ -391,6 +401,9 @@ function renderPreview(): void {
       break;
     case 'card':
       sheet = renderCard(state.props.card, state.extras.card.crop);
+      break;
+    case 'document':
+      sheet = renderDocument(state.props.document, state.extras.document.crop);
       break;
   }
   // 列印用的頁面名稱（見 print.css）

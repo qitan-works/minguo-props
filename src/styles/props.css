@@ -1519,3 +1519,332 @@
     cursor: pointer;
   }
 }
+
+/* ---------- 民國日常文件（第五版，src/render/document.ts） ---------- */
+
+.paper.stock-ticket {
+  --paper-base: #efe4c8;
+}
+
+.paper.stock-ticket-green {
+  --paper-base: #dfe6cf;
+}
+
+.paper.stock-pawn {
+  --paper-base: #e9dcc0;
+}
+
+.paper.stock-deed {
+  --paper-base: #ead7b0;
+}
+
+.paper.stock-form {
+  --paper-base: #f1ead9;
+}
+
+.paper.stock-envelope {
+  --paper-base: #e6d2a8;
+}
+
+.dc {
+  position: absolute;
+  inset: 0;
+  color: #221a12;
+}
+
+.dc > div,
+.dc > svg {
+  position: absolute;
+  box-sizing: border-box;
+}
+
+.dc-vt {
+  writing-mode: vertical-rl;
+  text-orientation: upright;
+  line-height: 1.15;
+  letter-spacing: 0.06em;
+  overflow: hidden;
+}
+
+.dc-hand {
+  font-family: var(--f-hand);
+  color: #1d2340;
+}
+
+.dc-label {
+  font-family: var(--f-title);
+}
+
+.dc-small {
+  font-family: var(--f-body);
+  opacity: 0.85;
+}
+
+.dc-red {
+  color: rgb(176 30 24);
+}
+
+.dc-no {
+  font-family: var(--f-masthead);
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+
+.dc-rule {
+  border-top: 0.3mm solid currentColor;
+}
+
+.dc-frame {
+  border: 0.5mm solid currentColor;
+}
+
+.dc-frame-double {
+  border: 1.4mm double currentColor;
+}
+
+.dc-frame-deed {
+  border: 2mm double rgb(150 40 30 / 0.85);
+  box-shadow: inset 0 0 0 1.4mm var(--paper-base), inset 0 0 0 1.8mm rgb(150 40 30 / 0.6);
+}
+
+.dc-stamp {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgb(186 34 26 / 0.9);
+  font-family: var(--f-masthead);
+  filter: url('#f-ink');
+}
+
+.dc-stamp-round {
+  border: 0.7mm solid currentColor;
+  border-radius: 50%;
+}
+
+.dc-stamp-square {
+  border: 0.8mm solid currentColor;
+}
+
+.dc-stamp-grid {
+  writing-mode: vertical-rl;
+  text-orientation: upright;
+  line-height: 1.02;
+}
+
+.dc-stamp-line {
+  white-space: nowrap;
+  letter-spacing: 0.04em;
+}
+
+/* 票券 */
+.dc-perf {
+  border-left: 0.4mm dashed rgb(80 70 50 / 0.6);
+}
+
+.dc-tk-org,
+.dc-tk-title,
+.dc-tk-route,
+.dc-tk-stub-title {
+  font-family: var(--f-title);
+  text-align: center;
+  white-space: nowrap;
+  letter-spacing: 0.1em;
+}
+
+.dc-tk-title {
+  font-family: var(--f-masthead);
+  letter-spacing: 0.4em;
+}
+
+.dc-tk-route {
+  display: flex;
+  justify-content: center;
+  align-items: baseline;
+  gap: 0.6em;
+  font-family: var(--f-hand);
+  color: #1d2340;
+}
+
+.dc-tk-arrow {
+  font-family: var(--f-title);
+  color: #221a12;
+  font-size: 0.5em;
+}
+
+.dc-tk-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 4mm;
+  align-content: start;
+}
+
+.dc-tk-grid .dc-value {
+  font-family: var(--f-hand);
+  color: #1d2340;
+}
+
+.dc-tk-rule,
+.dc-tk-stub-line {
+  font-family: var(--f-body);
+  line-height: 1.4;
+  opacity: 0.85;
+}
+
+/* 當票、地契 */
+.dc-pawn-org {
+  font-family: var(--f-masthead);
+  text-align: center;
+  letter-spacing: 0.3em;
+  white-space: nowrap;
+}
+
+.dc-pawn-org.rtl {
+  direction: rtl;
+}
+
+.dc-pawn-big {
+  font-family: var(--f-hand);
+  text-align: center;
+  line-height: 1.2;
+  opacity: 0.9;
+}
+
+.dc-deed-title {
+  font-family: var(--f-masthead);
+  letter-spacing: 0.4em;
+}
+
+/* 表格 */
+.dc-form-org,
+.dc-form-title {
+  font-family: var(--f-title);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.dc-form-title {
+  font-family: var(--f-masthead);
+}
+
+.dc-form-no {
+  text-align: right;
+}
+
+.dc-form-table {
+  border-top: 0.4mm solid currentColor;
+}
+
+.dc-form-row {
+  display: grid;
+  grid-template-columns: 20mm 1fr 20mm 1fr;
+  border-bottom: 0.25mm solid currentColor;
+}
+
+.dc-form-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-right: 0.2mm solid currentColor;
+  font-family: var(--f-title);
+}
+
+.dc-form-value {
+  display: flex;
+  align-items: center;
+  padding: 0 2mm;
+  border-right: 0.2mm solid currentColor;
+  font-size: 1.15em;
+}
+
+.dc-form-head {
+  font-family: var(--f-title);
+  border-bottom: 0.3mm solid currentColor;
+}
+
+.dc-form-notes {
+  background-image: repeating-linear-gradient(to bottom, transparent 0 8.7mm, rgb(60 50 40 / 0.35) 8.7mm 9mm);
+  overflow: hidden;
+}
+
+.dc-form-sign {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--f-title);
+  border-top: 0.25mm solid currentColor;
+  padding-top: 1mm;
+}
+
+.dc-diagram-box {
+  border: 0.25mm solid currentColor;
+}
+
+.dc-diagram {
+  width: 100%;
+  height: 92%;
+}
+
+.dc-diagram-cap {
+  text-align: center;
+  font-family: var(--f-title);
+  font-size: 3mm;
+}
+
+/* 信封 */
+.dc-env-frame {
+  border: 0.7mm solid rgb(176 40 30 / 0.85);
+  box-shadow: inset 0 0 0 1mm var(--paper-base), inset 0 0 0 1.3mm rgb(176 40 30 / 0.6);
+}
+
+.dc-env-name {
+  text-align: center;
+  letter-spacing: 0.15em;
+}
+
+.dc-postage {
+  color: rgb(160 50 40);
+}
+
+.dc-postage-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.dc-postage-name {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 2.8mm;
+  text-align: center;
+  font-family: var(--f-title);
+  font-size: 2.6mm;
+  white-space: nowrap;
+}
+
+.dc-postmark {
+  border: 0.5mm solid rgb(40 40 60 / 0.75);
+  border-radius: 50%;
+  color: rgb(40 40 60 / 0.8);
+  font-family: var(--f-title);
+  text-align: center;
+  filter: url('#f-ink');
+}
+
+.dc-pm-top {
+  margin-top: 4mm;
+  font-size: 4.2mm;
+  letter-spacing: 0.3em;
+}
+
+.dc-pm-date {
+  margin-top: 1mm;
+  font-size: 2.6mm;
+  white-space: nowrap;
+}
+
+.dc-cancel {
+  position: absolute;
+  color: rgb(40 40 60 / 0.6);
+  overflow: visible;
+}

@@ -667,3 +667,30 @@ textarea:focus-visible {
 .btn-danger {
   color: var(--ui-error);
 }
+
+/* ---------- 整版區塊拖曳換位置 ---------- */
+
+.block-dragging {
+  user-select: none;
+  cursor: grabbing;
+}
+
+.nr-drop-box {
+  position: absolute;
+  z-index: 6;
+  outline: 2px dashed rgb(31 90 160 / 0.85);
+  outline-offset: -2px;
+  background: rgb(31 90 160 / 0.1);
+  pointer-events: none;
+}
+
+.block-drag-ghost {
+  position: fixed;
+  z-index: 50;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: rgb(31 90 160 / 0.9);
+  color: #fff;
+  font-size: 0.8rem;
+  pointer-events: none;
+}

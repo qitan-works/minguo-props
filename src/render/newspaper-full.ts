@@ -42,9 +42,13 @@ export interface FullPageRender {
   readonly cut: { readonly polygon: readonly Point[]; readonly frame: Rect } | null;
 }
 
-/** 第四版的字比第三版小，一段才放得下八九個字：A4 2.7 mm、A5 2.3 mm。 */
-export function v4Cell(width: number, height: number): number {
+/**
+ * 第四版的字比第三版小，一段才放得下八九個字：A4 2.7 mm、A5 2.3 mm。
+ * 大字模式：A4 3.3 mm、A5 2.8 mm（一段的字少一點，拿在手上讀也不吃力）。
+ */
+export function v4Cell(width: number, height: number, big = false): number {
   const area = width * height;
+  if (big) return area >= 60000 ? 3.3 : area <= 32000 ? 2.8 : 3.05;
   return area >= 60000 ? 2.7 : area <= 32000 ? 2.3 : 2.5;
 }
 
@@ -588,7 +592,9 @@ export function buildPage(data: NewspaperData, extras: NewspaperExtras, g: Broad
     };
     plan = [...plan.slice(0, at + 1), photo, ...plan.slice(at + 1)];
   }
-  const blocks = resolveBlocks(plan, blocksExtras);
+  const resolved = resolveBlocks(plan, blocksExtras);
+  // 大字模式：小號內文改成中號，A4 列印時內文不小於約 3.2 mm（割注照舊是一行兩小行，跟著格子放大）
+  const blocks = data.bigText === true ? resolved.map((b) => (b.style.bodySize === 's' ? { ...b, style: { ...b.style, bodySize: 'm' as const } } : b)) : resolved;
   const locked = new Map<string, BlockEdit>(blocksExtras.edits.filter((e) => e.locked).map((e) => [e.id, e]));
   const fallbackLead = pool.items[0] ?? { id: 'ghost', source: 'filler' as const, level: 1 as const, title: '', subtitles: [], paragraphs: [] };
   const content = createContent({
@@ -663,7 +669,7 @@ export function renderNewspaperFull(data: NewspaperData, extras: NewspaperExtras
   const paperKey = isPaperKey(data.paper) ? data.paper : 'a4-portrait';
   const size = PAPER_SIZES[paperKey];
   const layoutKind = data.showMasthead && isMastheadLayout(data.mastheadLayout) ? data.mastheadLayout : 'none';
-  const g = broadsheetGeometry({ width: size.width, height: size.height, layout: layoutKind, header: data.headerStrip, cell: v4Cell(size.width, size.height) });
+  const g = broadsheetGeometry({ width: size.width, height: size.height, layout: layoutKind, header: data.headerStrip, cell: v4Cell(size.width, size.height, data.bigText === true) });
   const { layout, blocks, pool } = buildPage(data, extras, g);
   const mode = isPunctuationMode(data.punctuation) ? data.punctuation : 'circle';
 

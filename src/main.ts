@@ -1201,6 +1201,8 @@ renderTabs();
 rebuildForm();
 renderPreview();
 void loadSharedPack();
+// 頁面開著時點了另一個線索包網址（只有 # 後面改變，不會重新載入）
+window.addEventListener('hashchange', () => void loadSharedPack());
 
 /** 網址的 # 後面帶著線索包時，載入它並預覽整包。 */
 /** 對話框：本機已有線索包時，網址裡的那一包要取代、附加、或只預覽。按 Esc 或關掉視同只預覽。 */

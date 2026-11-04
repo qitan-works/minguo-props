@@ -5,6 +5,7 @@ import { createSafeStore, type SaveOutcome } from './lib/storage.ts';
 import { createCodebook, encodeTelegram, missingChars, substitutedChars, type Codebook } from './lib/telegraph.ts';
 import { renderCard } from './render/card.ts';
 import { renderLetter } from './render/letter.ts';
+import { renderRelic } from './render/relic.ts';
 import { fitNewspaperToContent, renderNewspaper } from './render/newspaper.ts';
 import { blockRect, renderNewspaperFull, type FullPageRender } from './render/newspaper-full.ts';
 import { applyPaperEffects } from './render/effects.ts';
@@ -469,6 +470,9 @@ function renderPreview(): void {
       break;
     case 'card':
       sheet = renderCard(state.props.card, state.extras.card.crop);
+      break;
+    case 'relic':
+      sheet = renderRelic(state.props.relic, state.extras.relic.crop);
       break;
   }
   // 列印用的頁面名稱（見 print.css）

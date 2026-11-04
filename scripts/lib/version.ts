@@ -92,7 +92,8 @@ export function checkVersionedRefs(files: ReadonlyMap<string, string>, version: 
     if (file.endsWith('.css')) {
       for (const m of text.matchAll(/url\(\s*["']?([^"')]+)["']?\s*\)/g)) {
         const ref = m[1] as string;
-        if (ref.startsWith('data:')) continue;
+        // data: 網址與同一份文件裡的參照（url(#濾鏡)）不會載入別的檔案
+        if (ref.startsWith('data:') || ref.startsWith('#')) continue;
         const font = /^(?:\.\.\/){2}fonts\/[\w-]+\/[\w.-]+\.woff2?\?v=[0-9a-f]{8,}$/.test(ref) && depth === 0;
         if (!font && escapes(ref, depth)) add(file, m[0]);
       }

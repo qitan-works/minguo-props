@@ -1615,6 +1615,48 @@
   border-bottom: 0.2mm solid currentColor;
   font-family: var(--f-title);
   font-weight: 700;
+/* ---------- 古物（第五版）：古籍殘頁、碑文拓片、符籙（src/render/relic.ts） ---------- */
+
+.paper.stock-book {
+  --paper-base: #ecdcb8;
+}
+
+.paper.stock-xuan {
+  --paper-base: #efe8d9;
+}
+
+.paper.stock-talisman {
+  --paper-base: #e6bf45;
+  background-image: radial-gradient(ellipse at 30% 20%, rgb(255 230 140 / 0.35), transparent 60%), radial-gradient(ellipse at 70% 80%, rgb(170 120 20 / 0.18), transparent 65%);
+}
+
+.rl {
+  position: absolute;
+  inset: 0;
+}
+
+.rl-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.rl-text {
+  position: absolute;
+  inset: 0;
+}
+
+.rl-text > div,
+.rl > .rl-headnote,
+.rl > .rl-seal,
+.rl > .rl-vt,
+.rl-hole {
+  position: absolute;
+}
+
+.rl-ch {
   text-align: center;
   white-space: nowrap;
 }
@@ -1627,4 +1669,122 @@
   writing-mode: vertical-rl;
   line-height: 1.35;
   letter-spacing: 0.04em;
+.rl-vt {
+  writing-mode: vertical-rl;
+  text-orientation: upright;
+  text-align: center;
+  white-space: nowrap;
+  line-height: 1.05;
+}
+
+/* 古籍：明體刻本；木刻質感用印泥濾鏡讓字邊毛、墨色不均 */
+.rl-book {
+  color: #241b12;
+}
+
+.rl-book .rl-ch {
+  font-family: var(--f-body);
+}
+
+.rl-woodblock {
+  filter: url('#f-ink');
+}
+
+.rl-heart .rl-vt {
+  font-family: var(--f-title);
+}
+
+/* 朱筆句讀：字的右下角一點；朱筆圈：字右側一個小圈 */
+.rl-ch.rl-stop::after {
+  content: '';
+  position: absolute;
+  right: 4%;
+  bottom: 6%;
+  width: 0.9mm;
+  height: 0.9mm;
+  border-radius: 50%;
+  background: rgb(192 38 26 / 0.88);
+}
+
+.rl-ch.rl-circ::before {
+  content: '';
+  position: absolute;
+  top: 34%;
+  right: -2%;
+  width: 1.3mm;
+  height: 1.3mm;
+  border: 0.28mm solid rgb(192 38 26 / 0.85);
+  border-radius: 50%;
+}
+
+.rl-headnote {
+  writing-mode: vertical-rl;
+  font-family: var(--f-hand);
+  color: rgb(186 34 24 / 0.95);
+  line-height: 1.25;
+  white-space: normal;
+}
+
+.rl-hole {
+  width: 1.8mm;
+  height: 1.8mm;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 0 0.25mm rgb(120 90 50 / 0.45);
+}
+
+/* 碑文拓片：墨拓上的字是紙色 */
+.rl-rubbing .rl-stone {
+  color: #e9e0cb;
+  font-family: var(--f-title);
+  -webkit-text-stroke: 0.25mm #e9e0cb;
+  filter: url('#f-ink');
+}
+
+.rl-stone-line {
+  stroke: rgb(225 215 195 / 0.75);
+}
+
+.rl-stone-title {
+  font-family: var(--f-masthead);
+}
+
+/* 印章 */
+.rl-seal {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  font-family: var(--f-masthead);
+  filter: url('#f-ink');
+}
+
+.rl-seal-text {
+  writing-mode: vertical-rl;
+  text-orientation: upright;
+  line-height: 1.02;
+  letter-spacing: 0;
+}
+
+.rl-seal-white {
+  background: rgb(176 30 24 / 0.9);
+  color: #f1e6d6;
+  border-radius: 0.6mm;
+}
+
+.rl-seal-red {
+  border: 0.5mm solid rgb(180 32 24 / 0.9);
+  color: rgb(180 32 24 / 0.92);
+}
+
+/* 符籙：朱砂 */
+.rl-tal-text {
+  font-family: var(--f-hand);
+  color: rgb(192 38 26 / 0.97);
+  -webkit-text-stroke: 0.35mm rgb(192 38 26 / 0.9);
+}
+
+.rl-tal-side {
+  font-family: var(--f-hand);
+  color: rgb(192 38 26 / 0.85);
 }

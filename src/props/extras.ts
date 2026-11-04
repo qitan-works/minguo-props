@@ -83,6 +83,7 @@ export interface ExtrasState {
   readonly telegram: PropExtras;
   readonly letter: PropExtras;
   readonly card: PropExtras;
+  readonly relic: PropExtras;
 }
 
 export const LIMITS = {
@@ -104,6 +105,7 @@ export function defaultExtras(): ExtrasState {
     telegram: { ...empty },
     letter: { ...empty },
     card: { ...empty },
+    relic: { ...empty },
   };
 }
 
@@ -234,6 +236,7 @@ export function sanitizeExtras(input: unknown, labels: Readonly<Record<keyof Ext
       telegram: sanitizeCommon(part('telegram'), labels.telegram, warnings),
       letter: sanitizeCommon(part('letter'), labels.letter, warnings),
       card: sanitizeCommon(part('card'), labels.card, warnings),
+      relic: sanitizeCommon(part('relic'), labels.relic, warnings),
     },
     warnings,
   };
@@ -254,6 +257,10 @@ export function newId(prefix: string): string {
 
 /** 存檔用：特效項目只存與樣式預設值不同的欄位（見 compactFxItem），其餘照原樣。 */
 export function compactExtras(extras: ExtrasState): Record<keyof ExtrasState, unknown> {
-  const pack = <T extends PropExtras>(e: T): Omit<T, 'effects'> & { effects: Record<string, unknown>[] } => ({ ...e, effects: e.effects.map(compactFxItem) });
-  return { newspaper: pack(extras.newspaper), telegram: pack(extras.telegram), letter: pack(extras.letter), card: pack(extras.card) };
+  const out = {} as Record<keyof ExtrasState, unknown>;
+  for (const key of Object.keys(extras) as (keyof ExtrasState)[]) {
+    const e: PropExtras = extras[key];
+    out[key] = { ...e, effects: e.effects.map(compactFxItem) };
+  }
+  return out;
 }
